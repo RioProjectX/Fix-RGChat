@@ -78,12 +78,14 @@ const DEFAULT_STATE = {
   }
 };
 
-// Initialize Firebase Web SDK
+// Initialize Firebase Web SDK & REST API config
 let firestoreDb: any = null;
 let isFirebaseConnected = false;
+let firebaseConfig: any = null;
+let firestoreRestUrl = "";
 
 try {
-  let firebaseConfig: any = firebaseConfigJson;
+  firebaseConfig = firebaseConfigJson;
   if (!firebaseConfig || !firebaseConfig.apiKey) {
     const configPath = path.join(process.cwd(), "firebase-applet-config.json");
     if (fs.existsSync(configPath)) {
@@ -92,6 +94,12 @@ try {
   }
 
   if (firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey) {
+    const projectId = firebaseConfig.projectId;
+    const dbId = firebaseConfig.firestoreDatabaseId || "(default)";
+    const apiKey = firebaseConfig.apiKey;
+    
+    firestoreRestUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/couple_state/default?key=${apiKey}`;
+
     const fbApp = getApps().length
       ? getApp()
       : initializeApp({
@@ -103,14 +111,13 @@ try {
           appId: firebaseConfig.appId
         });
     
-    const dbId = firebaseConfig.firestoreDatabaseId;
     if (dbId && dbId !== "(default)") {
       firestoreDb = getFirestore(fbApp, dbId);
     } else {
       firestoreDb = getFirestore(fbApp);
     }
     isFirebaseConnected = true;
-    console.log(`[Firebase] Firestore Web SDK initialized with project '${firebaseConfig.projectId}' (database: '${dbId || "default"}').`);
+    console.log(`[Firebase] Firestore Web SDK & REST initialized for project '${projectId}' (database: '${dbId}').`);
   } else {
     console.log("[Firebase] firebase-applet-config.json not found or missing credentials.");
   }
@@ -134,8 +141,43 @@ try {
   console.error("Error reading initial database cache:", error);
 }
 
-// Helper to read database state (Firebase Firestore with Local File fallback)
+// Helper to read database state (Firebase Firestore REST with Local File fallback)
 async function readDb(): Promise<any> {
+  if (firestoreRestUrl) {
+    try {
+      const res = await fetch(firestoreRestUrl);
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.fields) {
+          let stateObj: any = null;
+          if (json.fields.stateJson && json.fields.stateJson.stringValue) {
+            try {
+              stateObj = JSON.parse(json.fields.stateJson.stringValue);
+            } catch (e) {}
+          } else if (json.fields.state && json.fields.state.stringValue) {
+            try {
+              stateObj = JSON.parse(json.fields.state.stringValue);
+            } catch (e) {}
+          }
+
+          if (stateObj) {
+            localCacheState = stateObj;
+            try {
+              fs.writeFileSync(DB_FILE, JSON.stringify(localCacheState, null, 2), "utf-8");
+            } catch (e) {}
+            return localCacheState;
+          }
+        }
+      } else if (res.status === 404) {
+        console.log("[Firestore REST] Document not found, seeding default state...");
+        await writeDb(localCacheState);
+        return localCacheState;
+      }
+    } catch (error: any) {
+      console.error("[Firestore REST] read failed:", error.message || error);
+    }
+  }
+
   if (firestoreDb && isFirebaseConnected) {
     try {
       const docRef = doc(firestoreDb, "couple_state", "default");
@@ -144,33 +186,54 @@ async function readDb(): Promise<any> {
         const data = docSnap.data();
         if (data && data.state) {
           localCacheState = data.state;
-          try {
-            fs.writeFileSync(DB_FILE, JSON.stringify(localCacheState, null, 2), "utf-8");
-          } catch (e) {}
           return localCacheState;
         }
-      } else {
-        console.log("[Firebase] Document 'default' not found in Firestore. Seeding default state...");
-        await setDoc(docRef, {
-          state: localCacheState,
-          updatedAt: new Date().toISOString()
-        });
-        return localCacheState;
       }
     } catch (error: any) {
-      console.error("[Firebase] Firestore read failed, using local cache:", error.message || error);
+      console.error("[Firestore SDK] read failed:", error.message || error);
     }
   }
   return localCacheState;
 }
 
-// Helper to write database state (Firebase Firestore with Local File fallback)
+// Helper to write database state (Firebase Firestore REST with Local File fallback)
 async function writeDb(data: any): Promise<void> {
   localCacheState = data;
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
   } catch (error) {
     console.error("Error writing local backup:", error);
+  }
+
+  if (firestoreRestUrl) {
+    try {
+      const payload = {
+        fields: {
+          stateJson: {
+            stringValue: JSON.stringify(data)
+          },
+          updatedAt: {
+            stringValue: new Date().toISOString()
+          }
+        }
+      };
+
+      const res = await fetch(firestoreRestUrl, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        console.log("[Firestore REST] State successfully saved to Cloud Firestore.");
+        return;
+      } else {
+        const errText = await res.text();
+        console.error("[Firestore REST] Write status error:", res.status, errText);
+      }
+    } catch (error: any) {
+      console.error("[Firestore REST] Save failed:", error.message || error);
+    }
   }
 
   if (firestoreDb && isFirebaseConnected) {
@@ -180,9 +243,8 @@ async function writeDb(data: any): Promise<void> {
         state: data,
         updatedAt: new Date().toISOString()
       }, { merge: true });
-      console.log("[Firebase] State successfully saved to Firestore.");
     } catch (error: any) {
-      console.error("[Firebase] Firestore save failed:", error.message || error);
+      console.error("[Firestore SDK] Save failed:", error.message || error);
     }
   }
 }
