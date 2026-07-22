@@ -1,0 +1,20 @@
+{
+  "entities": {
+    "couple_state": {
+      "title": "Couple State",
+      "description": "Stores the shared state for KopelChat couples including chat, notes, todos, calendar, love capsules, and locations.",
+      "properties": {
+        "id": { "type": "string" },
+        "relationshipStartDate": { "type": "string" },
+        "messages": { "type": "array" },
+        "notes": { "type": "array" },
+        "todos": { "type": "array" },
+        "calendarEvents": { "type": "array" },
+        "loveCapsules": { "type": "array" },
+        "safeArrivals": { "type": "array" },
+        "locations": { "type": "object" },
+        "memories": { "type": "array" }
+      }
+    }
+  }
+}

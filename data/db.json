@@ -1,0 +1,59 @@
+{
+  "relationshipStartDate": "2023-10-15",
+  "partner1": {
+    "name": "Grace",
+    "avatar": "female-1",
+    "address": "Rumah: Jl. Margonda Raya No. 12, Depok",
+    "office": "Kampus: Universitas Indonesia",
+    "bio": "Selalu bahagia bersamamu 💖"
+  },
+  "partner2": {
+    "name": "Rio",
+    "avatar": "male-1",
+    "address": "Rumah: Jl. Kemang Raya No. 45, Jakarta Selatan",
+    "office": "Kantor: Menara BCA, Grand Indonesia",
+    "bio": "Menjaga dan mencintaimu selamanya 🌸"
+  },
+  "notes": "",
+  "todos": [],
+  "calendarEvents": [],
+  "chatMessages": [
+    {
+      "id": "msg-1784664687606",
+      "sender": "Rio",
+      "text": "seng",
+      "timestamp": "2026-07-21T20:11:27.606Z",
+      "isFavorited": false,
+      "mediaUrl": "",
+      "mediaType": "",
+      "isRead": false
+    },
+    {
+      "id": "msg-1784665281151",
+      "sender": "Rio",
+      "text": "i lopyu today n forever senk",
+      "timestamp": "2026-07-21T20:21:21.151Z",
+      "isFavorited": false,
+      "mediaUrl": "",
+      "mediaType": "",
+      "isRead": false
+    },
+    {
+      "id": "msg_1784665497195",
+      "sender": "Rio",
+      "text": "📞 Panggilan Video Tak Terjawab",
+      "timestamp": "2026-07-21T20:24:57.195Z",
+      "isFavorited": false,
+      "mediaUrl": "",
+      "mediaType": "",
+      "isRead": false
+    }
+  ],
+  "memories": [],
+  "mapPins": [],
+  "loveCapsules": [],
+  "safeArrivals": [],
+  "notifications": [],
+  "lastActiveRio": "2026-07-21T23:46:30.036Z",
+  "activeCall": null
+}

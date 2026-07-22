@@ -1,0 +1,12 @@
+{
+  "name": "KopelChat Web Cinta",
+  "description": "Aplikasi portal interaktif untuk pasangan romantis dengan fitur hitung lama hubungan, catatan real-time, to-do list bersama, kalender agenda, album kenangan, galeri media, peta kenangan, love capsule, dan safe arrival check-in.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

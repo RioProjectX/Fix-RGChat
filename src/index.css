@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", sans-serif;
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Natural Tones custom palette override */
+  --color-rose-50: #FAF8F5;
+  --color-rose-100: #E6D5B8;
+  --color-rose-200: #FAEDCD;
+  --color-rose-300: #CCD5AE;
+  --color-rose-400: #D4A373;
+  --color-rose-500: #BC8F8F;
+  --color-rose-600: #8B7E74;
+  --color-rose-700: #6D625B;
+  --color-rose-800: #4A403A;
+  --color-rose-900: #352F2C;
+  --color-rose-950: #25211F;
+
+  /* Specific theme colors */
+  --color-natural-beige: #FAF3E0;
+  --color-natural-clay: #D4A373;
+  --color-natural-sand: #FAEDCD;
+  --color-natural-moss: #588157;
+  --color-natural-sage: #CCD5AE;
+  --color-natural-cream: #FEFAE0;
+  --color-natural-rose: #BC8F8F;
+  --color-natural-taupe: #8B7E74;
+  --color-natural-taupe-light: #A89F91;
+  --color-natural-mud: #4A403A;
+  --color-natural-charcoal: #6D625B;
+  --color-natural-border: #E6D5B8;
+  --color-natural-lime: #E9EDC6;
+}
+
+body {
+  background-color: #FAF3E0;
+  color: #4A403A;
+  font-family: var(--font-sans);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #f1f1f1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #e2e8f0;
+}
+
+/* Heart Floating Animation */
+@keyframes float {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-80px) rotate(20deg);
+    opacity: 0;
+  }
+}
+
+.animate-float-heart {
+  animation: float 2s ease-out forwards;
+}
+
+/* Sparkle shine keyframes */
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s infinite ease-in-out;
+}

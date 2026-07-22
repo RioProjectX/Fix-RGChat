@@ -1,0 +1,19 @@
+{
+  "short_name": "KopelChat",
+  "name": "KopelChat Web Cinta 💖",
+  "description": "Aplikasi Obrolan & Live Location Pasangan Privat",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0B141A",
+  "theme_color": "#00A884",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/"
+}
