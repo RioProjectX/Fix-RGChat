@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Camera, Calendar, MapPin, Plus, Trash2, Heart, Sparkles } from "lucide-react";
+import { Camera, Calendar, MapPin, Plus, Trash2, Heart, Sparkles, Upload, X, Image as ImageIcon } from "lucide-react";
 import { Memory } from "../types";
 
 interface SharedMemoriesProps {
@@ -22,10 +22,49 @@ export default function SharedMemories({
   const [location, setLocation] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+
+  const handleImageFileChange = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      alert("Mohon pilih file gambar (JPG, PNG, WebP).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        setImageUrl(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleImageFileChange(e.dataTransfer.files[0]);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !imageUrl.trim() || !date) return;
+    if (!title.trim() || !imageUrl.trim() || !date) {
+      if (!imageUrl.trim()) {
+        alert("Mohon unggah foto kenangan terlebih dahulu!");
+      }
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -72,7 +111,54 @@ export default function SharedMemories({
             <Camera className="w-4 h-4 text-[#D4A373]" /> Potret Momen Bahagia Baru
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Image Upload Area */}
+          <div>
+            <label className="block text-[10px] font-bold text-[#8B7E74] uppercase mb-1">Unggah Foto Kenangan</label>
+            {imageUrl ? (
+              <div className="relative w-full max-w-xs h-40 rounded-xl overflow-hidden border-2 border-[#D4A373] shadow-sm bg-black/5 group">
+                <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setImageUrl("")}
+                  className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full shadow hover:bg-red-700 transition"
+                  title="Hapus / Ganti Foto"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-xl p-4 text-center transition cursor-pointer flex flex-col items-center justify-center bg-white ${
+                  dragActive ? "border-[#008069] bg-emerald-50/50" : "border-[#E6D5B8] hover:border-[#D4A373]"
+                }`}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleImageFileChange(e.target.files[0]);
+                    }
+                  }}
+                  className="hidden"
+                  id="memory-image-upload-input"
+                />
+                <label htmlFor="memory-image-upload-input" className="cursor-pointer flex flex-col items-center">
+                  <div className="w-10 h-10 rounded-full bg-[#FAF3E0] text-[#D4A373] flex items-center justify-center mb-1.5 shadow-sm">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <span className="text-xs font-bold text-[#8B7E74]">Pilih Foto dari Galeri / HP</span>
+                  <span className="text-[10px] text-[#A89F91] mt-0.5">atau seret &amp; lepas file gambar di sini (JPG, PNG, WebP)</span>
+                </label>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-[10px] font-bold text-[#8B7E74] uppercase mb-1">Judul Kenangan</label>
               <input
@@ -82,18 +168,6 @@ export default function SharedMemories({
                 className="w-full px-3 py-2 bg-white border border-[#E6D5B8] rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#D4A373] text-[#4A403A]"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-[#8B7E74] uppercase mb-1">Tautan Foto (URL)</label>
-              <input
-                type="url"
-                required
-                placeholder="https://images.unsplash.com/photo-..."
-                className="w-full px-3 py-2 bg-white border border-[#E6D5B8] rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#D4A373] text-[#4A403A]"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
               />
             </div>
 

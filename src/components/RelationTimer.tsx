@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Heart, Calendar, Sparkles, Check, Edit2 } from "lucide-react";
 import { motion } from "motion/react";
 import { Partner } from "../types";
@@ -31,6 +31,17 @@ export default function RelationTimer({
   const [p2Name, setP2Name] = useState(partner2.name);
   const [p2Address, setP2Address] = useState(partner2.address);
   const [p2Office, setP2Office] = useState(partner2.office);
+
+  // Synchronize state when props update
+  useEffect(() => {
+    setNewDate(startDateStr);
+    setP1Name(partner1.name);
+    setP1Address(partner1.address || "");
+    setP1Office(partner1.office || "");
+    setP2Name(partner2.name);
+    setP2Address(partner2.address || "");
+    setP2Office(partner2.office || "");
+  }, [startDateStr, partner1, partner2]);
 
   const startDate = new Date(startDateStr);
   const today = new Date();

@@ -68,21 +68,34 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
 
   // Get Battery Level if supported
   useEffect(() => {
-    if ("getBattery" in navigator) {
+    if (typeof navigator !== "undefined" && "getBattery" in navigator) {
       (navigator as any).getBattery().then((battery: any) => {
-        setBatteryLevel(Math.round(battery.level * 100));
-        battery.addEventListener("levelchange", () => {
+        if (typeof battery.level === "number") {
           setBatteryLevel(Math.round(battery.level * 100));
+        }
+        battery.addEventListener("levelchange", () => {
+          if (typeof battery.level === "number") {
+            setBatteryLevel(Math.round(battery.level * 100));
+          }
         });
-      }).catch(() => {});
+      }).catch(() => {
+        setBatteryLevel(undefined);
+      });
+    } else {
+      setBatteryLevel(undefined);
     }
   }, []);
 
   // Send coordinates to server
   const sendLocationToServer = useCallback(async (lat: number, lng: number, accuracy?: number, customNote?: string) => {
     try {
-      // Reverse geocoding optional fetch
-      let addressName = myLocation?.addressName || "Lokasi GPS";
+      let addressName = activePartnerInfo?.address || myLocation?.addressName || "Lokasi GPS Terkini";
+      
+      // If addressName is still the demo default, replace with profile address
+      if ((addressName.includes("Margonda") || addressName.includes("Kemang")) && activePartnerInfo?.address) {
+        addressName = activePartnerInfo.address;
+      }
+
       try {
         const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16`);
         if (geoRes.ok) {
@@ -114,9 +127,9 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
     } catch (err) {
       console.error("Gagal mengirim lokasi ke server:", err);
     }
-  }, [activeUser, myLocation?.addressName, myLocation?.statusNote, batteryLevel, onUpdateState]);
+  }, [activeUser, activePartnerInfo?.address, myLocation?.addressName, myLocation?.statusNote, batteryLevel, onUpdateState]);
 
-  // Request & Fetch current GPS position
+  // Request & Fetch current GPS position with fallback
   const handleFetchCurrentGps = useCallback(() => {
     if (!navigator.geolocation) {
       setGpsError("Browser Anda tidak mendukung Geolocation GPS.");
@@ -126,25 +139,35 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
     setIsGpsLoading(true);
     setGpsError("");
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setIsGpsLoading(false);
-        const { latitude, longitude, accuracy } = pos.coords;
-        sendLocationToServer(latitude, longitude, accuracy);
-      },
-      (err) => {
-        setIsGpsLoading(false);
-        console.warn("GPS error:", err);
-        if (err.code === err.PERMISSION_DENIED) {
-          setGpsError("Izin lokasi/GPS ditolak. Mohon aktifkan izin lokasi di browser Anda.");
-        } else if (err.code === err.POSITION_UNAVAILABLE) {
-          setGpsError("Informasi lokasi GPS tidak tersedia saat ini.");
-        } else {
-          setGpsError("Gagal mengambil koordinat GPS.");
-        }
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-    );
+    const fetchGpsPos = (highAccuracy: boolean) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setIsGpsLoading(false);
+          setGpsError("");
+          const { latitude, longitude, accuracy } = pos.coords;
+          sendLocationToServer(latitude, longitude, accuracy);
+        },
+        (err) => {
+          if (highAccuracy) {
+            // Retry with highAccuracy false (WiFi/IP triangulation fallback)
+            fetchGpsPos(false);
+          } else {
+            setIsGpsLoading(false);
+            console.warn("GPS error:", err);
+            if (err.code === err.PERMISSION_DENIED) {
+              setGpsError("Izin lokasi/GPS ditolak. Mohon aktifkan izin lokasi di browser Anda.");
+            } else if (err.code === err.POSITION_UNAVAILABLE) {
+              setGpsError("Informasi lokasi GPS tidak tersedia saat ini.");
+            } else {
+              setGpsError("Gagal mengambil koordinat GPS (Waktu habis).");
+            }
+          }
+        },
+        { enableHighAccuracy: highAccuracy, timeout: highAccuracy ? 8000 : 12000, maximumAge: 30000 }
+      );
+    };
+
+    fetchGpsPos(true);
   }, [sendLocationToServer]);
 
   // Periodic GPS watch / auto sync

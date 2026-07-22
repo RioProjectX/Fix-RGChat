@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import APP_LOGO_BASE64 from "./assets/logo";
 import { 
   Heart, 
   MessageSquare, 
@@ -1174,11 +1175,9 @@ export default function App() {
                 <div className="space-y-2">
                   <div className="relative w-24 h-24 mx-auto shadow-xl rounded-3xl overflow-hidden border-2 border-[#008069]">
                     <img 
-                      src="/app_logo.jpg" 
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = "https://strong-violet-s3qekg2q.edgeone.dev/WhatsApp%20Image%202026-05-29%20at%2023.14.18.jpeg"; }}
+                      src={APP_LOGO_BASE64} 
                       alt="R&GChat Logo" 
                       className="w-full h-full object-cover" 
-                      referrerPolicy="no-referrer"
                     />
                     <div className="absolute bottom-1 right-1 bg-[#008069] text-white p-1 rounded-full shadow">
                       <Lock className="w-3.5 h-3.5" />
@@ -1598,11 +1597,9 @@ export default function App() {
               </div>
               <div className="flex items-center space-x-2">
                 <img 
-                  src="/app_logo.jpg" 
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = "https://strong-violet-s3qekg2q.edgeone.dev/WhatsApp%20Image%202026-05-29%20at%2023.14.18.jpeg"; }}
+                  src={APP_LOGO_BASE64} 
                   alt="R&GChat Logo" 
                   className="w-6 h-6 rounded-full object-cover border border-white/40 shadow-sm" 
-                  referrerPolicy="no-referrer" 
                 />
                 <div>
                   <h1 className="text-sm font-bold tracking-tight">R&amp;GChat 💬</h1>
@@ -1774,11 +1771,9 @@ export default function App() {
               <div className="max-w-md space-y-4">
                 <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-[#00A884] mx-auto mb-2 shadow-lg">
                   <img 
-                    src="/app_logo.jpg" 
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = "https://strong-violet-s3qekg2q.edgeone.dev/WhatsApp%20Image%202026-05-29%20at%2023.14.18.jpeg"; }}
+                    src={APP_LOGO_BASE64} 
                     alt="R&GChat Logo" 
                     className="w-full h-full object-cover" 
-                    referrerPolicy="no-referrer"
                   />
                 </div>
                 <h1 className="text-2xl font-bold text-[#41525D] font-sans">R&amp;GChat 💬</h1>

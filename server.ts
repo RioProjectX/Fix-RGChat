@@ -60,9 +60,9 @@ const DEFAULT_STATE = {
       accuracy: 15,
       updatedAt: new Date().toISOString(),
       isSharing: true,
-      addressName: "Jl. Margonda Raya, Depok",
+      addressName: "Jl. Margonda Raya No. 12, Depok",
       statusNote: "Kuliah di Kampus UI 📚",
-      batteryLevel: 88
+      batteryLevel: undefined
     },
     Rio: {
       user: "Rio",
@@ -71,9 +71,9 @@ const DEFAULT_STATE = {
       accuracy: 12,
       updatedAt: new Date().toISOString(),
       isSharing: true,
-      addressName: "Kemang Raya, Jakarta Selatan",
+      addressName: "Jl. Kemang Raya No. 45, Jakarta Selatan",
       statusNote: "Di kantor Menara BCA 💻",
-      batteryLevel: 94
+      batteryLevel: undefined
     }
   }
 };
@@ -342,8 +342,23 @@ apiRouter.post("/relationship-start-date", async (req, res) => {
 apiRouter.post("/partners", async (req, res) => {
   const { partner1, partner2 } = req.body;
   const db = await readDb();
-  if (partner1) db.partner1 = { ...db.partner1, ...partner1 };
-  if (partner2) db.partner2 = { ...db.partner2, ...partner2 };
+  if (!db.liveLocations) db.liveLocations = {};
+
+  if (partner1) {
+    db.partner1 = { ...db.partner1, ...partner1 };
+    const name = db.partner1.name || "Grace";
+    if (db.liveLocations[name]) {
+      if (partner1.address) db.liveLocations[name].addressName = partner1.address;
+    }
+  }
+  if (partner2) {
+    db.partner2 = { ...db.partner2, ...partner2 };
+    const name = db.partner2.name || "Rio";
+    if (db.liveLocations[name]) {
+      if (partner2.address) db.liveLocations[name].addressName = partner2.address;
+    }
+  }
+
   await writeDb(db);
   res.json({ success: true, state: db });
 });
