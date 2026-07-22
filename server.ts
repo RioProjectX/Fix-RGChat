@@ -96,12 +96,41 @@ let firebaseConfig: any = null;
 let firestoreRestUrl = "";
 
 try {
-  firebaseConfig = firebaseConfigJson;
+  let cfg = (firebaseConfigJson as any)?.default || firebaseConfigJson;
+  if (cfg && cfg.projectId && cfg.apiKey) {
+    firebaseConfig = cfg;
+  }
+
   if (!firebaseConfig || !firebaseConfig.apiKey) {
-    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-    if (fs.existsSync(configPath)) {
-      firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    const possiblePaths = [
+      path.join(process.cwd(), "firebase-applet-config.json"),
+      path.join(__dirname, "firebase-applet-config.json"),
+      path.join(__dirname, "..", "firebase-applet-config.json")
+    ];
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        try {
+          const fileData = JSON.parse(fs.readFileSync(p, "utf-8"));
+          if (fileData?.apiKey) {
+            firebaseConfig = fileData;
+            break;
+          }
+        } catch (e) {}
+      }
     }
+  }
+
+  // Fallback guarantee so Vercel Serverless Function ALWAYS has Cloud Firestore credentials
+  if (!firebaseConfig || !firebaseConfig.apiKey) {
+    firebaseConfig = {
+      projectId: "lively-theater-1tgzl",
+      firestoreDatabaseId: "ai-studio-remixremixrgchat-e21e6176-af71-4e89-ab98-48381d71c62d",
+      apiKey: "AIzaSyBaKmcahoXaT0f229ULoxl_aw_l40sEv38",
+      authDomain: "lively-theater-1tgzl.firebaseapp.com",
+      storageBucket: "lively-theater-1tgzl.firebasestorage.app",
+      messagingSenderId: "453418613118",
+      appId: "1:453418613118:web:126ef89a87cd52d5b6fbb7"
+    };
   }
 
   if (firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey) {

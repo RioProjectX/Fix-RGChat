@@ -11,7 +11,7 @@ import { AppState, UserLiveLocation } from "../types";
 interface LiveLocationProps {
   state: AppState;
   activeUser: "Grace" | "Rio";
-  onUpdateState: () => void;
+  onUpdateState: (updatedState?: AppState) => void;
 }
 
 // Calculate distance between two coordinates in km using Haversine formula
@@ -97,7 +97,12 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
       }
 
       try {
-        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16`, {
+          signal: controller.signal
+        }).finally(() => clearTimeout(timeoutId));
+
         if (geoRes.ok) {
           const geoData = await geoRes.json();
           if (geoData.display_name) {
@@ -106,10 +111,10 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
           }
         }
       } catch (e) {
-        // ignore geocode network errors
+        // ignore geocode network / timeout errors
       }
 
-      await fetch("/api/live-location", {
+      const res = await fetch("/api/live-location", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -123,7 +128,14 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
           batteryLevel
         })
       });
-      onUpdateState();
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.state) {
+          onUpdateState(data.state);
+        } else {
+          onUpdateState();
+        }
+      }
     } catch (err) {
       console.error("Gagal mengirim lokasi ke server:", err);
     }

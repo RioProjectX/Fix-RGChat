@@ -36,7 +36,7 @@ import {
   BellRing
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { AppState, Partner, ActiveCallState, INITIAL_DEFAULT_STATE } from "./types";
+import { AppState, Partner, ActiveCallState, Memory, INITIAL_DEFAULT_STATE } from "./types";
 import { db, doc, onSnapshot, setDoc } from "./firebase";
 
 // Import sub-components
@@ -64,7 +64,18 @@ export default function App() {
   const [pinError, setPinError] = useState<string>("");
 
   const [activeTab, setActiveTab] = useState<TabType | null>(null);
-  const [state, setState] = useState<AppState>(INITIAL_DEFAULT_STATE);
+  const [state, setState] = useState<AppState>(() => {
+    try {
+      const saved = localStorage.getItem("couple_app_state");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === "object" && (parsed.partner1 || parsed.chatMessages)) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return INITIAL_DEFAULT_STATE;
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -632,12 +643,20 @@ export default function App() {
 
   const handleUpdateStartDate = async (date: string) => {
     try {
+      const nextState: AppState = { ...state, relationshipStartDate: date };
+      setState(nextState);
+      try { localStorage.setItem("couple_app_state", JSON.stringify(nextState)); } catch(e){}
+      syncStateToFirestore(nextState);
+
       const res = await fetch("/api/relationship-start-date", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date })
       });
-      if (res.ok) fetchState();
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.state) setState(data.state);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -645,12 +664,24 @@ export default function App() {
 
   const handleUpdatePartners = async (p1: Partial<Partner>, p2: Partial<Partner>) => {
     try {
+      const nextState: AppState = {
+        ...state,
+        partner1: { ...state.partner1, ...p1 },
+        partner2: { ...state.partner2, ...p2 }
+      };
+      setState(nextState);
+      try { localStorage.setItem("couple_app_state", JSON.stringify(nextState)); } catch(e){}
+      syncStateToFirestore(nextState);
+
       const res = await fetch("/api/partners", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ partner1: p1, partner2: p2 })
       });
-      if (res.ok) fetchState();
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.state) setState(data.state);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -857,12 +888,31 @@ export default function App() {
 
   const handleAddMemory = async (title: string, imageUrl: string, date: string, caption: string, location: string) => {
     try {
+      const newMemory: Memory = {
+        id: "mem-" + Date.now(),
+        title,
+        imageUrl,
+        date,
+        caption: caption || "",
+        location: location || "",
+        createdBy: activeUser,
+        createdAt: new Date().toISOString()
+      };
+      const nextMemories = [newMemory, ...(state.memories || [])].sort((a, b) => b.date.localeCompare(a.date));
+      const nextState: AppState = { ...state, memories: nextMemories };
+      setState(nextState);
+      try { localStorage.setItem("couple_app_state", JSON.stringify(nextState)); } catch(e){}
+      syncStateToFirestore(nextState);
+
       const res = await fetch("/api/memories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, imageUrl, date, caption, location, createdBy: activeUser })
       });
-      if (res.ok) fetchState();
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.state) setState(data.state);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -870,8 +920,17 @@ export default function App() {
 
   const handleDeleteMemory = async (id: string) => {
     try {
+      const nextMemories = (state.memories || []).filter((m) => m.id !== id);
+      const nextState: AppState = { ...state, memories: nextMemories };
+      setState(nextState);
+      try { localStorage.setItem("couple_app_state", JSON.stringify(nextState)); } catch(e){}
+      syncStateToFirestore(nextState);
+
       const res = await fetch(`/api/memories/${id}`, { method: "DELETE" });
-      if (res.ok) fetchState();
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.state) setState(data.state);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -2001,7 +2060,14 @@ export default function App() {
                       <LiveLocation
                         state={state}
                         activeUser={activeUser}
-                        onUpdateState={fetchState}
+                        onUpdateState={(updatedState) => {
+                          if (updatedState) {
+                            setState(updatedState);
+                            try { localStorage.setItem("couple_app_state", JSON.stringify(updatedState)); } catch(e){}
+                          } else {
+                            fetchState();
+                          }
+                        }}
                       />
                     )}
 
