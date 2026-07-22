@@ -623,15 +623,47 @@ export default function App() {
   };
 
   const handleSendMessage = async (text: string, mediaUrl: string) => {
+    if (!text && !mediaUrl) return;
+
+    const tempMsg = {
+      id: "msg-" + Date.now(),
+      sender: activeUser,
+      text: text || "",
+      timestamp: new Date().toISOString(),
+      isFavorited: false,
+      mediaUrl: mediaUrl || "",
+      mediaType: mediaUrl ? "image" : "",
+      isRead: false
+    };
+
+    // Optimistic UI update so bubble chat appears instantly 0ms after user clicks send
+    setState((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        chatMessages: [...(prev.chatMessages || []), tempMsg]
+      };
+    });
+
     try {
       const res = await fetch("/api/chat-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sender: activeUser, text, mediaUrl })
       });
-      if (res.ok) fetchState();
+      if (res.ok) {
+        const data = await res.json();
+        if (data.state) {
+          setState(data.state);
+        } else {
+          fetchState();
+        }
+      } else {
+        fetchState();
+      }
     } catch (err) {
       console.error(err);
+      fetchState();
     }
   };
 

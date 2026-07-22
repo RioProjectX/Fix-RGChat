@@ -4,6 +4,7 @@ import fs from "fs";
 import os from "os";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import firebaseConfigJson from "./firebase-applet-config.json";
 
 const app = express();
 const PORT = 3000;
@@ -82,30 +83,34 @@ let firestoreDb: any = null;
 let isFirebaseConnected = false;
 
 try {
-  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-  if (fs.existsSync(configPath)) {
-    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    if (firebaseConfig.projectId && firebaseConfig.apiKey) {
-      const fbApp = initializeApp({
-        apiKey: firebaseConfig.apiKey,
-        authDomain: firebaseConfig.authDomain,
-        projectId: firebaseConfig.projectId,
-        storageBucket: firebaseConfig.storageBucket,
-        messagingSenderId: firebaseConfig.messagingSenderId,
-        appId: firebaseConfig.appId
-      });
-      
-      const dbId = firebaseConfig.firestoreDatabaseId;
-      if (dbId && dbId !== "(default)") {
-        firestoreDb = getFirestore(fbApp, dbId);
-      } else {
-        firestoreDb = getFirestore(fbApp);
-      }
-      isFirebaseConnected = true;
-      console.log(`[Firebase] Firestore Web SDK initialized with project '${firebaseConfig.projectId}' (database: '${dbId || "default"}').`);
+  let firebaseConfig: any = firebaseConfigJson;
+  if (!firebaseConfig || !firebaseConfig.apiKey) {
+    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+    if (fs.existsSync(configPath)) {
+      firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
     }
+  }
+
+  if (firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey) {
+    const fbApp = initializeApp({
+      apiKey: firebaseConfig.apiKey,
+      authDomain: firebaseConfig.authDomain,
+      projectId: firebaseConfig.projectId,
+      storageBucket: firebaseConfig.storageBucket,
+      messagingSenderId: firebaseConfig.messagingSenderId,
+      appId: firebaseConfig.appId
+    });
+    
+    const dbId = firebaseConfig.firestoreDatabaseId;
+    if (dbId && dbId !== "(default)") {
+      firestoreDb = getFirestore(fbApp, dbId);
+    } else {
+      firestoreDb = getFirestore(fbApp);
+    }
+    isFirebaseConnected = true;
+    console.log(`[Firebase] Firestore Web SDK initialized with project '${firebaseConfig.projectId}' (database: '${dbId || "default"}').`);
   } else {
-    console.log("[Firebase] firebase-applet-config.json not found. Running with local db.json storage.");
+    console.log("[Firebase] firebase-applet-config.json not found or missing credentials.");
   }
 } catch (error) {
   console.error("[Firebase] Error initializing Firebase SDK:", error);
