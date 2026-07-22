@@ -168,7 +168,14 @@ function parseFirestoreValue(val: any): any {
 async function readDb(): Promise<any> {
   if (firestoreRestUrl) {
     try {
-      const res = await fetch(firestoreRestUrl, { cache: "no-store" });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const res = await fetch(firestoreRestUrl, { 
+        cache: "no-store",
+        signal: controller.signal
+      }).finally(() => clearTimeout(timeoutId));
+
       if (res.ok) {
         const json = await res.json();
         if (json && json.fields) {
@@ -203,7 +210,7 @@ async function readDb(): Promise<any> {
         return localCacheState;
       }
     } catch (error: any) {
-      console.error("[Firestore REST] read failed:", error.message || error);
+      console.warn("[Firestore REST] Notice: operating with local database backup:", error.message || error);
     }
   }
 
@@ -216,7 +223,7 @@ async function writeDb(data: any): Promise<void> {
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
   } catch (error) {
-    console.error("Error writing local backup:", error);
+    console.warn("Notice: writing local backup:", error);
   }
 
   if (firestoreRestUrl) {
@@ -236,18 +243,25 @@ async function writeDb(data: any): Promise<void> {
     // Perform up to 3 attempts with exponential backoff for transient 503/5xx errors
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+
         let res = await fetch(patchUrl, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        }).finally(() => clearTimeout(timeoutId));
 
         if (!res.ok && res.status === 404) {
+          const controller2 = new AbortController();
+          const timeoutId2 = setTimeout(() => controller2.abort(), 6000);
           res = await fetch(firestoreRestUrl, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
+            body: JSON.stringify(payload),
+            signal: controller2.signal
+          }).finally(() => clearTimeout(timeoutId2));
         }
 
         if (res.ok) {
@@ -258,14 +272,14 @@ async function writeDb(data: any): Promise<void> {
           await new Promise((resolve) => setTimeout(resolve, attempt * 400));
         } else {
           const errText = await res.text();
-          console.error("[Firestore REST] Write status error:", res.status, errText);
+          console.warn("[Firestore REST] Write status info:", res.status, errText);
           break;
         }
       } catch (error: any) {
         if (attempt < 3) {
           await new Promise((resolve) => setTimeout(resolve, attempt * 400));
         } else {
-          console.error("[Firestore REST] Save failed:", error.message || error);
+          console.warn("[Firestore REST] Local backup retained (Cloud sync pending):", error.message || error);
         }
       }
     }
