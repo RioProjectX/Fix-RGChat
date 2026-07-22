@@ -89,29 +89,25 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
   // Send coordinates to server
   const sendLocationToServer = useCallback(async (lat: number, lng: number, accuracy?: number, customNote?: string) => {
     try {
-      let addressName = activePartnerInfo?.address || myLocation?.addressName || "Lokasi GPS Terkini";
-      
-      // If addressName is still the demo default, replace with profile address
-      if ((addressName.includes("Margonda") || addressName.includes("Kemang")) && activePartnerInfo?.address) {
-        addressName = activePartnerInfo.address;
-      }
+      let addressName = "";
 
+      // 1. Try server-side reverse geocoding
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
-        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16`, {
-          signal: controller.signal
-        }).finally(() => clearTimeout(timeoutId));
-
+        const geoRes = await fetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`);
         if (geoRes.ok) {
           const geoData = await geoRes.json();
-          if (geoData.display_name) {
-            const parts = geoData.display_name.split(",");
+          if (geoData?.displayName) {
+            const parts = geoData.displayName.split(",");
             addressName = parts.slice(0, 3).join(", ");
           }
         }
       } catch (e) {
-        // ignore geocode network / timeout errors
+        // Fallback
+      }
+
+      // 2. If reverse geocoding fails, format clean coordinate address
+      if (!addressName) {
+        addressName = `Lokasi GPS Terkini (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
       }
 
       const res = await fetch("/api/live-location", {
@@ -139,7 +135,7 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
     } catch (err) {
       console.error("Gagal mengirim lokasi ke server:", err);
     }
-  }, [activeUser, activePartnerInfo?.address, myLocation?.addressName, myLocation?.statusNote, batteryLevel, onUpdateState]);
+  }, [activeUser, myLocation?.statusNote, batteryLevel, onUpdateState]);
 
   // Request & Fetch current GPS position with fallback
   const handleFetchCurrentGps = useCallback(() => {
@@ -167,15 +163,15 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
             setIsGpsLoading(false);
             console.warn("GPS error:", err);
             if (err.code === err.PERMISSION_DENIED) {
-              setGpsError("Izin lokasi/GPS ditolak. Mohon aktifkan izin lokasi di browser Anda.");
+              setGpsError("Izin GPS ditolak di browser. Mohon izinkan akses lokasi untuk situs ini.");
             } else if (err.code === err.POSITION_UNAVAILABLE) {
-              setGpsError("Informasi lokasi GPS tidak tersedia saat ini.");
+              setGpsError("Sinyal lokasi GPS tidak tersedia saat ini. Pastikan GPS HP aktif.");
             } else {
-              setGpsError("Gagal mengambil koordinat GPS (Waktu habis).");
+              setGpsError("Waktu permintaan lokasi GPS habis. Silakan coba lagi.");
             }
           }
         },
-        { enableHighAccuracy: highAccuracy, timeout: highAccuracy ? 8000 : 12000, maximumAge: 30000 }
+        { enableHighAccuracy: highAccuracy, timeout: highAccuracy ? 8000 : 15000, maximumAge: 0 }
       );
     };
 
@@ -197,7 +193,7 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
       (err) => {
         console.warn("Watch position error:", err);
       },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 15000 }
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 }
     );
 
     return () => {
@@ -207,17 +203,24 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
 
   // Toggle Sharing On / Off
   const handleToggleSharing = async () => {
-    const nextSharingState = !(myLocation?.isSharing ?? true);
+    const isCurrentlySharing = myLocation?.isSharing ?? true;
+    const nextSharingState = !isCurrentlySharing;
     try {
-      await fetch("/api/live-location/toggle", {
+      const res = await fetch("/api/live-location/toggle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user: activeUser, isSharing: nextSharingState })
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.state) {
+          onUpdateState(data.state);
+        } else {
+          onUpdateState();
+        }
+      }
       if (nextSharingState) {
         handleFetchCurrentGps();
-      } else {
-        onUpdateState();
       }
     } catch (e) {
       console.error("Gagal mengubah status berbagi lokasi:", e);
@@ -609,37 +612,40 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
               <button
                 type="button"
                 onClick={handleToggleSharing}
+                title={myLocation?.isSharing ?? true ? "Klik untuk mematikan berbagi lokasi" : "Klik untuk mulai berbagi lokasi"}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center space-x-1.5 shadow-2xs ${
                   myLocation?.isSharing ?? true
                     ? "bg-[#00A884] hover:bg-[#008069] text-white"
-                    : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                    : "bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-200"
                 }`}
               >
                 <Power className="w-3.5 h-3.5" />
-                <span>{myLocation?.isSharing ?? true ? "Berbagi" : "Mati"}</span>
+                <span>{myLocation?.isSharing ?? true ? "Berbagi: AKTIF" : "Berbagi: MATI"}</span>
               </button>
             </div>
 
-            {/* Current Address & Refresh Button */}
-            <div className="space-y-2 text-xs">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start space-x-2">
-                  <MapPinIcon className="w-4 h-4 text-pink-500 shrink-0 mt-0.5" />
+            {/* Current Address & GPS Refresh Action */}
+            <div className="space-y-2.5 text-xs">
+              <div className="flex items-start space-x-2 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+                <MapPinIcon className="w-4 h-4 text-pink-500 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] text-gray-400 block font-bold uppercase tracking-wider">Lokasi GPS Saat Ini:</span>
                   <span className="font-semibold text-gray-800 line-clamp-2">
-                    {myLocation?.addressName || "Lokasi GPS Saya"}
+                    {myLocation?.addressName || "Lokasi GPS Terdeteksi"}
                   </span>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleFetchCurrentGps}
-                  disabled={isGpsLoading}
-                  className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition cursor-pointer shrink-0"
-                  title="Perbarui GPS Sekarang"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isGpsLoading ? "animate-spin" : ""}`} />
-                </button>
               </div>
+
+              {/* Prominent GPS Refresh / Sync Button */}
+              <button
+                type="button"
+                onClick={handleFetchCurrentGps}
+                disabled={isGpsLoading}
+                className="w-full py-2 px-3 bg-emerald-50 hover:bg-emerald-100/90 text-[#008069] border border-emerald-200/80 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition cursor-pointer shadow-2xs disabled:opacity-60"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isGpsLoading ? "animate-spin text-emerald-600" : ""}`} />
+                <span>{isGpsLoading ? "Mengambil Koordinat GPS..." : "📍 Dapatkan / Bagikan Lokasi Saya Sekarang"}</span>
+              </button>
 
               {/* Status Note Input Form */}
               <form onSubmit={handleSaveStatusNote} className="space-y-1.5 pt-1">

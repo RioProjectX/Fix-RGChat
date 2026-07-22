@@ -753,6 +753,34 @@ apiRouter.post("/live-location", async (req, res) => {
   res.json({ success: true, liveLocations: db.liveLocations, state: db });
 });
 
+// Reverse Geocoding Helper
+apiRouter.get("/geocode/reverse", async (req, res) => {
+  const { lat, lng } = req.query;
+  if (!lat || !lng) {
+    return res.status(400).json({ error: "lat and lng are required" });
+  }
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16`, {
+      headers: {
+        "User-Agent": "CoupleApp/1.0 (contact@coupleapp.internal)"
+      },
+      signal: controller.signal
+    }).finally(() => clearTimeout(timeoutId));
+
+    if (response.ok) {
+      const data: any = await response.json();
+      if (data && data.display_name) {
+        return res.json({ success: true, displayName: data.display_name });
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  res.json({ success: false, displayName: "" });
+});
+
 // Toggle Live Location Sharing
 apiRouter.post("/live-location/toggle", async (req, res) => {
   const { user, isSharing } = req.body;
