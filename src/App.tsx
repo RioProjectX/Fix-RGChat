@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { AppState, Partner, INITIAL_DEFAULT_STATE } from "./types";
+import { db, doc, onSnapshot, setDoc } from "./firebase";
 
 // Import sub-components
 import RelationTimer from "./components/RelationTimer";
@@ -349,7 +350,7 @@ export default function App() {
     }
   }, [lastNotificationId, activeUser, isAuthenticated]);
 
-  // Load state on mount and set up real-time polling every 2 seconds
+  // Load state on mount and set up real-time polling every 2 seconds as backup
   useEffect(() => {
     fetchState(true);
     const interval = setInterval(() => {
@@ -357,6 +358,93 @@ export default function App() {
     }, 2000);
     return () => clearInterval(interval);
   }, [fetchState]);
+
+  // Direct Cloud Firestore Real-time listener via WebSockets/push for 0ms multi-device sync
+  useEffect(() => {
+    if (!db) return;
+    try {
+      const docRef = doc(db, "couple_state", "default");
+      const unsubscribe = onSnapshot(docRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          let newState: AppState | null = null;
+          if (data.state) {
+            newState = data.state;
+          } else if (data.stateJson) {
+            try {
+              newState = JSON.parse(data.stateJson);
+            } catch (e) {}
+          }
+
+          if (newState && typeof newState === "object" && (newState.partner1 || newState.chatMessages)) {
+            setState((prev) => {
+              if (newState?.chatMessages && newState.chatMessages.length > 0) {
+                const latestMsg = newState.chatMessages[newState.chatMessages.length - 1];
+                if (latestMsg.sender !== activeUser) {
+                  if (lastMsgNotifiedIdRef.current !== null && lastMsgNotifiedIdRef.current !== latestMsg.id) {
+                    if ("Notification" in window && Notification.permission === "granted") {
+                      const notifTitle = `Pesan Baru dari ${latestMsg.sender} 💖`;
+                      const notifBody = latestMsg.text 
+                        ? latestMsg.text 
+                        : (latestMsg.mediaUrl ? "Mengirimkan foto/media 🖼️" : "Pesan Baru");
+
+                      if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                        navigator.serviceWorker.ready.then((reg) => {
+                          reg.showNotification(notifTitle, {
+                            body: notifBody,
+                            icon: "/icon.svg",
+                            badge: "/icon.svg",
+                            tag: "chat-" + latestMsg.id
+                          } as NotificationOptions);
+                        });
+                      } else {
+                        new Notification(notifTitle, {
+                          body: notifBody,
+                          icon: "/icon.svg"
+                        });
+                      }
+                    }
+                  }
+                  lastMsgNotifiedIdRef.current = latestMsg.id;
+                }
+              }
+              return newState;
+            });
+            setLoading(false);
+          }
+        }
+      }, (err) => {
+        console.warn("[Client Firestore] onSnapshot error:", err);
+      });
+      return () => unsubscribe();
+    } catch (err) {
+      console.warn("[Client Firestore] Subscription error:", err);
+    }
+  }, [activeUser]);
+
+  // Heartbeat presence updater: updates lastActiveGrace / lastActiveRio in Firestore every 4 seconds
+  useEffect(() => {
+    if (!isAuthenticated || !activeUser || !db) return;
+    const updateActiveStatus = async () => {
+      const nowStr = new Date().toISOString();
+      const lastActiveKey = activeUser === "Grace" ? "lastActiveGrace" : "lastActiveRio";
+      try {
+        const docRef = doc(db, "couple_state", "default");
+        await setDoc(docRef, {
+          state: {
+            [lastActiveKey]: nowStr
+          },
+          updatedAt: nowStr
+        }, { merge: true });
+      } catch (e) {
+        console.warn("Heartbeat write error:", e);
+      }
+    };
+
+    updateActiveStatus();
+    const interval = setInterval(updateActiveStatus, 4000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, activeUser]);
 
   // Auto-select chat tab on desktop, and list view on mobile
   useEffect(() => {
@@ -636,14 +724,31 @@ export default function App() {
       isRead: false
     };
 
+    let nextState: AppState | null = null;
+
     // Optimistic UI update so bubble chat appears instantly 0ms after user clicks send
     setState((prev) => {
       if (!prev) return prev;
-      return {
+      nextState = {
         ...prev,
         chatMessages: [...(prev.chatMessages || []), tempMsg]
       };
+      return nextState;
     });
+
+    // Write to client Firestore directly for instant real-time sync on partner's device
+    if (db && nextState) {
+      try {
+        const docRef = doc(db, "couple_state", "default");
+        await setDoc(docRef, {
+          state: nextState,
+          stateJson: JSON.stringify(nextState),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (e) {
+        console.warn("Direct setDoc error:", e);
+      }
+    }
 
     try {
       const res = await fetch("/api/chat-message", {
@@ -655,15 +760,10 @@ export default function App() {
         const data = await res.json();
         if (data.state) {
           setState(data.state);
-        } else {
-          fetchState();
         }
-      } else {
-        fetchState();
       }
     } catch (err) {
       console.error(err);
-      fetchState();
     }
   };
 
