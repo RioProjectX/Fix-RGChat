@@ -35,7 +35,7 @@ import {
   BellRing
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { AppState, Partner, INITIAL_DEFAULT_STATE } from "./types";
+import { AppState, Partner, ActiveCallState, INITIAL_DEFAULT_STATE } from "./types";
 import { db, doc, onSnapshot, setDoc } from "./firebase";
 
 // Import sub-components
@@ -710,7 +710,7 @@ export default function App() {
     if (!text && !mediaUrl) return;
 
     const tempMsg = {
-      id: "msg-" + Date.now(),
+      id: "msg-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
       sender: activeUser,
       text: text || "",
       timestamp: new Date().toISOString(),
@@ -746,17 +746,11 @@ export default function App() {
     }
 
     try {
-      const res = await fetch("/api/chat-message", {
+      await fetch("/api/chat-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sender: activeUser, text, mediaUrl })
+        body: JSON.stringify({ id: tempMsg.id, sender: activeUser, text, mediaUrl })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.state) {
-          setState(data.state);
-        }
-      }
     } catch (err) {
       console.error(err);
     }
@@ -874,81 +868,205 @@ export default function App() {
   };
 
   const handleTriggerCall = async (type: "audio" | "video") => {
+    const caller = activeUser;
+    const receiver = caller === "Grace" ? "Rio" : "Grace";
+    const callObj: ActiveCallState = {
+      id: "call_" + Date.now(),
+      caller,
+      receiver,
+      type,
+      status: "calling",
+      createdAt: new Date().toISOString()
+    };
+
+    let nextState: AppState | null = null;
+    setState((prev) => {
+      if (!prev) return prev;
+      nextState = { ...prev, activeCall: callObj };
+      return nextState;
+    });
+
+    if (db && nextState) {
+      try {
+        const docRef = doc(db, "couple_state", "default");
+        await setDoc(docRef, {
+          stateJson: JSON.stringify(nextState),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (e) {
+        console.warn("Client setDoc call trigger error:", e);
+      }
+    }
+
     try {
-      const res = await fetch("/api/call/start", {
+      await fetch("/api/call/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caller: activeUser, type })
+        body: JSON.stringify({ caller, type })
       });
-      if (res.ok) {
-        fetchState();
-      }
     } catch (err) {
       console.error("Gagal memulai panggilan:", err);
     }
   };
 
   const handleAnswerCall = async () => {
+    if (!state?.activeCall) return;
+    const updatedCall: ActiveCallState = {
+      ...state.activeCall,
+      status: "connected",
+      startedAt: new Date().toISOString()
+    };
+
+    let nextState: AppState | null = null;
+    setState((prev) => {
+      if (!prev) return prev;
+      nextState = { ...prev, activeCall: updatedCall };
+      return nextState;
+    });
+
+    if (db && nextState) {
+      try {
+        const docRef = doc(db, "couple_state", "default");
+        await setDoc(docRef, {
+          stateJson: JSON.stringify(nextState),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (e) {
+        console.warn("Client setDoc call answer error:", e);
+      }
+    }
+
     try {
-      const res = await fetch("/api/call/answer", {
+      await fetch("/api/call/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user: activeUser })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.state) setState(data.state);
-        else fetchState();
-      }
     } catch (err) {
       console.error("Gagal menjawab panggilan:", err);
     }
   };
 
   const handleDeclineCall = async () => {
+    stopCameraStream();
+    setCallDuration(0);
+
+    let nextState: AppState | null = null;
+    setState((prev) => {
+      if (!prev) return prev;
+      if (prev.activeCall) {
+        const callTypeLabel = prev.activeCall.type === "video" ? "Video" : "Suara";
+        const callMsg = {
+          id: "msg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+          sender: prev.activeCall.caller,
+          text: `📞 Panggilan ${callTypeLabel} Ditolak`,
+          timestamp: new Date().toISOString(),
+          isFavorited: false,
+          mediaUrl: "",
+          mediaType: "",
+          isRead: false
+        };
+        const currentMsgs = Array.isArray(prev.chatMessages) ? prev.chatMessages : [];
+        nextState = {
+          ...prev,
+          activeCall: null,
+          chatMessages: [...currentMsgs, callMsg]
+        };
+      } else {
+        nextState = { ...prev, activeCall: null };
+      }
+      return nextState;
+    });
+
+    if (db && nextState) {
+      try {
+        const docRef = doc(db, "couple_state", "default");
+        await setDoc(docRef, {
+          stateJson: JSON.stringify(nextState),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (e) {
+        console.warn("Client setDoc call decline error:", e);
+      }
+    }
+
     try {
-      stopCameraStream();
-      setState((prev) => (prev ? { ...prev, activeCall: null } : prev));
-      setCallDuration(0);
-      const res = await fetch("/api/call/decline", {
+      await fetch("/api/call/decline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user: activeUser })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.state) setState(data.state);
-        else fetchState();
-      } else {
-        fetchState();
-      }
     } catch (err) {
       console.error("Gagal menolak panggilan:", err);
-      fetchState();
     }
   };
 
   const handleEndCall = async () => {
+    stopCameraStream();
+    const currentDuration = callDuration;
+    setCallDuration(0);
+
+    let nextState: AppState | null = null;
+    setState((prev) => {
+      if (!prev) return prev;
+      if (prev.activeCall) {
+        const currentCall = prev.activeCall;
+        const callTypeLabel = currentCall.type === "video" ? "Video" : "Suara";
+        let logText = "";
+        if (currentCall.status === "connected") {
+          const m = Math.floor(currentDuration / 60);
+          const s = currentDuration % 60;
+          const timeFormatted = `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+          logText = `📞 Panggilan ${callTypeLabel} Selesai (${timeFormatted})`;
+        } else if (currentCall.status === "calling") {
+          logText = currentCall.caller === activeUser
+            ? `📞 Panggilan ${callTypeLabel} Dibatalkan`
+            : `📞 Panggilan ${callTypeLabel} Tidak Terjawab`;
+        }
+
+        const callMsg = {
+          id: "msg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+          sender: currentCall.caller,
+          text: logText,
+          timestamp: new Date().toISOString(),
+          isFavorited: false,
+          mediaUrl: "",
+          mediaType: "",
+          isRead: false
+        };
+
+        const currentMsgs = Array.isArray(prev.chatMessages) ? prev.chatMessages : [];
+        nextState = {
+          ...prev,
+          activeCall: null,
+          chatMessages: logText ? [...currentMsgs, callMsg] : currentMsgs
+        };
+      } else {
+        nextState = { ...prev, activeCall: null };
+      }
+      return nextState;
+    });
+
+    if (db && nextState) {
+      try {
+        const docRef = doc(db, "couple_state", "default");
+        await setDoc(docRef, {
+          stateJson: JSON.stringify(nextState),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (e) {
+        console.warn("Client setDoc call end error:", e);
+      }
+    }
+
     try {
-      stopCameraStream();
-      const currentDuration = callDuration;
-      setState((prev) => (prev ? { ...prev, activeCall: null } : prev));
-      setCallDuration(0);
-      const res = await fetch("/api/call/end", {
+      await fetch("/api/call/end", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user: activeUser, durationSeconds: currentDuration })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.state) setState(data.state);
-        else fetchState();
-      } else {
-        fetchState();
-      }
     } catch (err) {
       console.error("Gagal mengakhiri panggilan:", err);
-      fetchState();
     }
   };
 

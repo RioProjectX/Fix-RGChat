@@ -220,42 +220,54 @@ async function writeDb(data: any): Promise<void> {
   }
 
   if (firestoreRestUrl) {
-    try {
-      const payload = {
-        fields: {
-          stateJson: {
-            stringValue: JSON.stringify(data)
-          },
-          updatedAt: {
-            stringValue: new Date().toISOString()
-          }
+    const payload = {
+      fields: {
+        stateJson: {
+          stringValue: JSON.stringify(data)
+        },
+        updatedAt: {
+          stringValue: new Date().toISOString()
         }
-      };
+      }
+    };
 
-      const patchUrl = `${firestoreRestUrl}&updateMask.fieldPaths=stateJson&updateMask.fieldPaths=updatedAt`;
+    const patchUrl = `${firestoreRestUrl}&updateMask.fieldPaths=stateJson&updateMask.fieldPaths=updatedAt`;
 
-      let res = await fetch(patchUrl, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok && res.status === 404) {
-        res = await fetch(firestoreRestUrl, {
+    // Perform up to 3 attempts with exponential backoff for transient 503/5xx errors
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        let res = await fetch(patchUrl, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-      }
 
-      if (res.ok) {
-        console.log("[Firestore REST] State successfully saved to Cloud Firestore.");
-      } else {
-        const errText = await res.text();
-        console.error("[Firestore REST] Write status error:", res.status, errText);
+        if (!res.ok && res.status === 404) {
+          res = await fetch(firestoreRestUrl, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+        }
+
+        if (res.ok) {
+          console.log("[Firestore REST] State successfully saved to Cloud Firestore.");
+          break;
+        } else if (res.status >= 500 && attempt < 3) {
+          console.warn(`[Firestore REST] Transient error ${res.status}, retrying attempt ${attempt}...`);
+          await new Promise((resolve) => setTimeout(resolve, attempt * 400));
+        } else {
+          const errText = await res.text();
+          console.error("[Firestore REST] Write status error:", res.status, errText);
+          break;
+        }
+      } catch (error: any) {
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 400));
+        } else {
+          console.error("[Firestore REST] Save failed:", error.message || error);
+        }
       }
-    } catch (error: any) {
-      console.error("[Firestore REST] Save failed:", error.message || error);
     }
   }
 }
@@ -410,13 +422,16 @@ apiRouter.delete("/calendar-events/:id", async (req, res) => {
 
 // 10. Send a Chat Message & auto-parse media for Galeri Media
 apiRouter.post("/chat-message", async (req, res) => {
-  const { sender, text, mediaUrl, mediaType } = req.body;
+  const { sender, text, mediaUrl, mediaType, id } = req.body;
   if (!text && !mediaUrl) {
     return res.status(400).json({ error: "Text or media is required" });
   }
   const db = await readDb();
+  if (!Array.isArray(db.chatMessages)) db.chatMessages = [];
+
+  const msgId = id || ("msg-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6));
   const newMsg = {
-    id: "msg-" + Date.now(),
+    id: msgId,
     sender,
     text: text || "",
     timestamp: new Date().toISOString(),
@@ -426,19 +441,14 @@ apiRouter.post("/chat-message", async (req, res) => {
     isRead: false
   };
 
-  // Prevent duplicate insertion if client already wrote this message directly via Firestore setDoc
-  const isDuplicate = Array.isArray(db.chatMessages) && db.chatMessages.some((m: any) => 
-    m.sender === newMsg.sender && 
-    m.text === newMsg.text && 
-    Math.abs(new Date(m.timestamp).getTime() - new Date(newMsg.timestamp).getTime()) < 5000
-  );
-
-  if (!isDuplicate) {
-    if (!Array.isArray(db.chatMessages)) db.chatMessages = [];
+  const existingIdx = db.chatMessages.findIndex((m: any) => m.id === msgId);
+  if (existingIdx === -1) {
     db.chatMessages.push(newMsg);
-    await writeDb(db);
+  } else {
+    db.chatMessages[existingIdx] = newMsg;
   }
 
+  await writeDb(db);
   res.json({ success: true, message: newMsg, state: db });
 });
 
