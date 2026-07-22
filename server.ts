@@ -203,18 +203,7 @@ apiRouter.get("/state", async (req, res) => {
     if (!lastActiveVal || (now.getTime() - new Date(lastActiveVal).getTime() >= 10000)) {
       const nowStr = now.toISOString();
       db[lastActiveKey] = nowStr;
-      if (firestoreDb && isFirebaseConnected) {
-        try {
-          const docRef = doc(firestoreDb, "couple_state", "default");
-          await setDoc(docRef, {
-            state: {
-              [lastActiveKey]: nowStr
-            }
-          }, { merge: true });
-        } catch (e) {
-          console.error("Error updating lastActive in Firestore:", e);
-        }
-      }
+      await writeDb(db);
     }
   }
   
