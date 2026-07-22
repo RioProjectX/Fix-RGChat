@@ -368,15 +368,19 @@ export default function App() {
         if (snapshot.exists()) {
           const data = snapshot.data();
           let newState: AppState | null = null;
-          if (data.state) {
-            newState = data.state;
-          } else if (data.stateJson) {
+          
+          // ALWAYS prioritize stateJson as it contains the full serialized AppState
+          if (data.stateJson) {
             try {
               newState = JSON.parse(data.stateJson);
             } catch (e) {}
           }
+          
+          if (!newState && data.state && typeof data.state === "object" && (data.state.partner1 || data.state.chatMessages)) {
+            newState = data.state;
+          }
 
-          if (newState && typeof newState === "object" && (newState.partner1 || newState.chatMessages)) {
+          if (newState && typeof newState === "object" && (newState.partner1 || Array.isArray(newState.chatMessages))) {
             setState((prev) => {
               if (newState?.chatMessages && newState.chatMessages.length > 0) {
                 const latestMsg = newState.chatMessages[newState.chatMessages.length - 1];
@@ -422,27 +426,19 @@ export default function App() {
     }
   }, [activeUser]);
 
-  // Heartbeat presence updater: updates lastActiveGrace / lastActiveRio in Firestore every 4 seconds
+  // Heartbeat presence updater: pings server API to update lastActive time without corrupting Firestore document
   useEffect(() => {
-    if (!isAuthenticated || !activeUser || !db) return;
+    if (!isAuthenticated || !activeUser) return;
     const updateActiveStatus = async () => {
-      const nowStr = new Date().toISOString();
-      const lastActiveKey = activeUser === "Grace" ? "lastActiveGrace" : "lastActiveRio";
       try {
-        const docRef = doc(db, "couple_state", "default");
-        await setDoc(docRef, {
-          state: {
-            [lastActiveKey]: nowStr
-          },
-          updatedAt: nowStr
-        }, { merge: true });
+        await fetch(`/api/state?user=${encodeURIComponent(activeUser)}`);
       } catch (e) {
-        console.warn("Heartbeat write error:", e);
+        console.warn("Heartbeat ping warning:", e);
       }
     };
 
     updateActiveStatus();
-    const interval = setInterval(updateActiveStatus, 4000);
+    const interval = setInterval(updateActiveStatus, 5000);
     return () => clearInterval(interval);
   }, [isAuthenticated, activeUser]);
 
@@ -741,7 +737,6 @@ export default function App() {
       try {
         const docRef = doc(db, "couple_state", "default");
         await setDoc(docRef, {
-          state: nextState,
           stateJson: JSON.stringify(nextState),
           updatedAt: new Date().toISOString()
         }, { merge: true });

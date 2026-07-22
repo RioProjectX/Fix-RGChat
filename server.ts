@@ -168,7 +168,7 @@ function parseFirestoreValue(val: any): any {
 async function readDb(): Promise<any> {
   if (firestoreRestUrl) {
     try {
-      const res = await fetch(firestoreRestUrl);
+      const res = await fetch(firestoreRestUrl, { cache: "no-store" });
       if (res.ok) {
         const json = await res.json();
         if (json && json.fields) {
@@ -183,12 +183,13 @@ async function readDb(): Promise<any> {
               stateObj = JSON.parse(json.fields.state.stringValue);
             } catch (e) {}
           } else if (json.fields.state && json.fields.state.mapValue) {
-            stateObj = parseFirestoreValue(json.fields.state);
-          } else {
-            stateObj = parseFirestoreValue({ mapValue: { fields: json.fields } });
+            const parsedMap = parseFirestoreValue(json.fields.state);
+            if (parsedMap && (parsedMap.partner1 || parsedMap.chatMessages)) {
+              stateObj = parsedMap;
+            }
           }
 
-          if (stateObj && typeof stateObj === "object" && (stateObj.partner1 || stateObj.chatMessages)) {
+          if (stateObj && typeof stateObj === "object" && (stateObj.partner1 || Array.isArray(stateObj.chatMessages))) {
             localCacheState = { ...DEFAULT_STATE, ...stateObj };
             try {
               fs.writeFileSync(DB_FILE, JSON.stringify(localCacheState, null, 2), "utf-8");
@@ -424,8 +425,20 @@ apiRouter.post("/chat-message", async (req, res) => {
     mediaType: mediaType || (mediaUrl ? "image" : ""),
     isRead: false
   };
-  db.chatMessages.push(newMsg);
-  await writeDb(db);
+
+  // Prevent duplicate insertion if client already wrote this message directly via Firestore setDoc
+  const isDuplicate = Array.isArray(db.chatMessages) && db.chatMessages.some((m: any) => 
+    m.sender === newMsg.sender && 
+    m.text === newMsg.text && 
+    Math.abs(new Date(m.timestamp).getTime() - new Date(newMsg.timestamp).getTime()) < 5000
+  );
+
+  if (!isDuplicate) {
+    if (!Array.isArray(db.chatMessages)) db.chatMessages = [];
+    db.chatMessages.push(newMsg);
+    await writeDb(db);
+  }
+
   res.json({ success: true, message: newMsg, state: db });
 });
 
