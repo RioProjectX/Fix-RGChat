@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import os from "os";
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import firebaseConfigJson from "./firebase-applet-config.json";
 
@@ -92,14 +92,16 @@ try {
   }
 
   if (firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey) {
-    const fbApp = initializeApp({
-      apiKey: firebaseConfig.apiKey,
-      authDomain: firebaseConfig.authDomain,
-      projectId: firebaseConfig.projectId,
-      storageBucket: firebaseConfig.storageBucket,
-      messagingSenderId: firebaseConfig.messagingSenderId,
-      appId: firebaseConfig.appId
-    });
+    const fbApp = getApps().length
+      ? getApp()
+      : initializeApp({
+          apiKey: firebaseConfig.apiKey,
+          authDomain: firebaseConfig.authDomain,
+          projectId: firebaseConfig.projectId,
+          storageBucket: firebaseConfig.storageBucket,
+          messagingSenderId: firebaseConfig.messagingSenderId,
+          appId: firebaseConfig.appId
+        });
     
     const dbId = firebaseConfig.firestoreDatabaseId;
     if (dbId && dbId !== "(default)") {
@@ -198,15 +200,21 @@ apiRouter.get("/state", async (req, res) => {
     const lastActiveKey = user === "Grace" ? "lastActiveGrace" : "lastActiveRio";
     const lastActiveVal = db[lastActiveKey];
     
-    let shouldUpdate = false;
-
     if (!lastActiveVal || (now.getTime() - new Date(lastActiveVal).getTime() >= 10000)) {
-      db[lastActiveKey] = now.toISOString();
-      shouldUpdate = true;
-    }
-    
-    if (shouldUpdate) {
-      await writeDb(db);
+      const nowStr = now.toISOString();
+      db[lastActiveKey] = nowStr;
+      if (firestoreDb && isFirebaseConnected) {
+        try {
+          const docRef = doc(firestoreDb, "couple_state", "default");
+          await setDoc(docRef, {
+            state: {
+              [lastActiveKey]: nowStr
+            }
+          }, { merge: true });
+        } catch (e) {
+          console.error("Error updating lastActive in Firestore:", e);
+        }
+      }
     }
   }
   
