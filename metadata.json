@@ -1,6 +1,6 @@
 {
-  "name": "KopelChat Web Cinta",
-  "description": "Aplikasi portal interaktif untuk pasangan romantis dengan fitur hitung lama hubungan, catatan real-time, to-do list bersama, kalender agenda, album kenangan, galeri media, peta kenangan, love capsule, dan safe arrival check-in.",
+  "name": "R&GChat",
+  "description": "Aplikasi portal & chat romantis untuk pasangan Rio & Grace (R&GChat) dengan pesan instant real-time, panggilan suara & video, album kenangan, kalender, dan fitur couple.",
   "requestFramePermissions": [
     "camera",
     "microphone",

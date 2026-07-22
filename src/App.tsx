@@ -1148,12 +1148,20 @@ export default function App() {
                 className="w-full max-w-md flex flex-col items-center text-center space-y-8"
               >
                 <div className="space-y-2">
-                  <div className="w-16 h-16 bg-[#008069] rounded-2xl flex items-center justify-center text-white mx-auto shadow-md">
-                    <Lock className="w-8 h-8" />
+                  <div className="relative w-20 h-20 mx-auto shadow-lg rounded-2xl overflow-hidden border-2 border-[#008069]">
+                    <img 
+                      src="/app_logo.jpg" 
+                      alt="R&GChat Logo" 
+                      className="w-full h-full object-cover" 
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute bottom-1 right-1 bg-[#008069] text-white p-1 rounded-full shadow">
+                      <Lock className="w-3.5 h-3.5" />
+                    </div>
                   </div>
-                  <h1 className="text-2xl font-serif italic font-bold text-[#8B7E74] tracking-tight mt-4">R&amp;GChat 💬</h1>
+                  <h1 className="text-2xl font-serif italic font-bold text-[#8B7E74] tracking-tight mt-3">R&amp;GChat 💬</h1>
                   <p className="text-xs text-[#A89F91] font-medium leading-relaxed">
-                    Sistem Obrolan Pribadi Terenkripsi & Romantis.<br />Silakan pilih profil Anda untuk membuka kunci.
+                    Sistem Obrolan Pribadi Terenkripsi &amp; Romantis.<br />Silakan pilih profil Anda untuk membuka kunci.
                   </p>
                 </div>
 
@@ -1563,9 +1571,12 @@ export default function App() {
                 )}
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#25D366] rounded-full border border-white" />
               </div>
-              <div>
-                <h1 className="text-sm font-bold tracking-tight">R&amp;GChat 💬</h1>
-                <p className="text-[10px] opacity-90 font-medium">Aktif: {activeUser}</p>
+              <div className="flex items-center space-x-2">
+                <img src="/app_logo.jpg" alt="R&GChat Logo" className="w-5 h-5 rounded-full object-cover border border-white/40 shadow-sm" referrerPolicy="no-referrer" />
+                <div>
+                  <h1 className="text-sm font-bold tracking-tight">R&amp;GChat 💬</h1>
+                  <p className="text-[10px] opacity-90 font-medium">Aktif: {activeUser}</p>
+                </div>
               </div>
             </div>
 

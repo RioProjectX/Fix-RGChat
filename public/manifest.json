@@ -1,11 +1,11 @@
 {
-  "short_name": "KopelChat",
-  "name": "KopelChat Web Cinta 💖",
-  "description": "Aplikasi Obrolan & Live Location Pasangan Privat",
+  "short_name": "R&GChat",
+  "name": "R&GChat 💖",
+  "description": "Aplikasi Obrolan & Live Portal Pasangan Privat Rio & Grace",
   "icons": [
     {
-      "src": "/icon.svg",
-      "type": "image/svg+xml",
+      "src": "/app_logo.jpg",
+      "type": "image/jpeg",
       "sizes": "192x192 512x512",
       "purpose": "any maskable"
     }

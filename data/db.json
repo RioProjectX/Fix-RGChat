@@ -3,46 +3,65 @@
   "partner1": {
     "name": "Grace",
     "avatar": "female-1",
-    "address": "Rumah: Jl. Margonda Raya No. 12, Depok",
     "office": "Kampus: Universitas Indonesia",
-    "bio": "Selalu bahagia bersamamu 💖"
+    "address": "Rumah: Jl. Margonda Raya No. 12, Depok",
+    "bio": ""
   },
   "partner2": {
-    "name": "Rio",
-    "avatar": "male-1",
     "address": "Rumah: Jl. Kemang Raya No. 45, Jakarta Selatan",
+    "avatar": "male-1",
     "office": "Kantor: Menara BCA, Grand Indonesia",
-    "bio": "Menjaga dan mencintaimu selamanya 🌸"
+    "name": "Rio"
   },
   "notes": "",
   "todos": [],
   "calendarEvents": [],
   "chatMessages": [
     {
-      "id": "msg-1784664687606",
+      "text": "tes",
       "sender": "Rio",
-      "text": "seng",
-      "timestamp": "2026-07-21T20:11:27.606Z",
+      "isRead": false,
+      "mediaType": "",
+      "isFavorited": false,
+      "id": "msg-1784696001870",
+      "mediaUrl": "",
+      "timestamp": "2026-07-22T04:53:21.870Z"
+    },
+    {
+      "id": "msg_1784707582028_gjde",
+      "sender": "Grace",
+      "text": "📞 Panggilan Suara Dibatalkan",
+      "timestamp": "2026-07-22T08:06:22.028Z",
       "isFavorited": false,
       "mediaUrl": "",
       "mediaType": "",
       "isRead": false
     },
     {
-      "id": "msg-1784665281151",
-      "sender": "Rio",
-      "text": "i lopyu today n forever senk",
-      "timestamp": "2026-07-21T20:21:21.151Z",
+      "id": "msg_1784708135006_gug2",
+      "sender": "Grace",
+      "text": "📞 Panggilan Video Ditolak",
+      "timestamp": "2026-07-22T08:15:35.006Z",
       "isFavorited": false,
       "mediaUrl": "",
       "mediaType": "",
       "isRead": false
     },
     {
-      "id": "msg_1784665497195",
+      "id": "msg-1784708325470-ebk4",
       "sender": "Rio",
-      "text": "📞 Panggilan Video Tak Terjawab",
-      "timestamp": "2026-07-21T20:24:57.195Z",
+      "text": "p",
+      "timestamp": "2026-07-22T08:18:45.470Z",
+      "isFavorited": false,
+      "mediaUrl": "",
+      "mediaType": "",
+      "isRead": false
+    },
+    {
+      "id": "msg-1784708365961-ll8b",
+      "sender": "Grace",
+      "text": "ou syg",
+      "timestamp": "2026-07-22T08:19:25.961Z",
       "isFavorited": false,
       "mediaUrl": "",
       "mediaType": "",
@@ -54,6 +73,30 @@
   "loveCapsules": [],
   "safeArrivals": [],
   "notifications": [],
-  "lastActiveRio": "2026-07-21T23:46:30.036Z",
-  "activeCall": null
+  "activeCall": null,
+  "liveLocations": {
+    "Grace": {
+      "user": "Grace",
+      "lat": -6.3686,
+      "lng": 106.8322,
+      "accuracy": 15,
+      "updatedAt": "2026-07-22T06:29:35.419Z",
+      "isSharing": true,
+      "addressName": "Jl. Margonda Raya, Depok",
+      "statusNote": "Kuliah di Kampus UI 📚",
+      "batteryLevel": 88
+    },
+    "Rio": {
+      "user": "Rio",
+      "lat": -6.2615,
+      "lng": 106.8152,
+      "accuracy": 12,
+      "updatedAt": "2026-07-22T06:29:35.420Z",
+      "isSharing": true,
+      "addressName": "Kemang Raya, Jakarta Selatan",
+      "statusNote": "Di kantor Menara BCA 💻",
+      "batteryLevel": 94
+    }
+  },
+  "lastActiveRio": "2026-07-22T08:14:14.908Z"
 }
