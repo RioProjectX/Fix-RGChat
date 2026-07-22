@@ -1150,7 +1150,8 @@ export default function App() {
                 <div className="space-y-2">
                   <div className="relative w-20 h-20 mx-auto shadow-lg rounded-2xl overflow-hidden border-2 border-[#008069]">
                     <img 
-                      src="/app_logo.jpg" 
+                      src="https://strong-violet-s3qekg2q.edgeone.dev/WhatsApp%20Image%202026-05-29%20at%2023.14.18.jpeg" 
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/app_logo.jpg"; }}
                       alt="R&GChat Logo" 
                       className="w-full h-full object-cover" 
                       referrerPolicy="no-referrer"
@@ -1572,7 +1573,13 @@ export default function App() {
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#25D366] rounded-full border border-white" />
               </div>
               <div className="flex items-center space-x-2">
-                <img src="/app_logo.jpg" alt="R&GChat Logo" className="w-5 h-5 rounded-full object-cover border border-white/40 shadow-sm" referrerPolicy="no-referrer" />
+                <img 
+                  src="https://strong-violet-s3qekg2q.edgeone.dev/WhatsApp%20Image%202026-05-29%20at%2023.14.18.jpeg" 
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/app_logo.jpg"; }}
+                  alt="R&GChat Logo" 
+                  className="w-5 h-5 rounded-full object-cover border border-white/40 shadow-sm" 
+                  referrerPolicy="no-referrer" 
+                />
                 <div>
                   <h1 className="text-sm font-bold tracking-tight">R&amp;GChat 💬</h1>
                   <p className="text-[10px] opacity-90 font-medium">Aktif: {activeUser}</p>
