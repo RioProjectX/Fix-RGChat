@@ -1,10 +1,12 @@
-// Service Worker for KopelChat PWA & Background Notifications
-const CACHE_NAME = "kopelchat-v1";
+// Service Worker for R&GChat PWA & Background Notifications
+const CACHE_NAME = "rgchat-v2";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
   "/manifest.json",
-  "/icon.svg"
+  "/icon.svg",
+  "/app_logo.jpg",
+  "/icon.png"
 ];
 
 // Install Event
@@ -46,7 +48,7 @@ self.addEventListener("fetch", (event) => {
 
 // Listen for Push / System Notifications
 self.addEventListener("push", (event) => {
-  let data = { title: "Pesan Baru 💖", body: "Ada pesan baru dari pasanganmu!", url: "/" };
+  let data = { title: "Pesan Baru", body: "Ada pesan baru dari pasanganmu!", url: "/" };
   if (event.data) {
     try {
       data = event.data.json();

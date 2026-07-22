@@ -1148,10 +1148,10 @@ export default function App() {
                 className="w-full max-w-md flex flex-col items-center text-center space-y-8"
               >
                 <div className="space-y-2">
-                  <div className="relative w-20 h-20 mx-auto shadow-lg rounded-2xl overflow-hidden border-2 border-[#008069]">
+                  <div className="relative w-24 h-24 mx-auto shadow-xl rounded-3xl overflow-hidden border-2 border-[#008069]">
                     <img 
-                      src="https://strong-violet-s3qekg2q.edgeone.dev/WhatsApp%20Image%202026-05-29%20at%2023.14.18.jpeg" 
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/app_logo.jpg"; }}
+                      src="/app_logo.jpg" 
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = "https://strong-violet-s3qekg2q.edgeone.dev/WhatsApp%20Image%202026-05-29%20at%2023.14.18.jpeg"; }}
                       alt="R&GChat Logo" 
                       className="w-full h-full object-cover" 
                       referrerPolicy="no-referrer"
@@ -1574,10 +1574,10 @@ export default function App() {
               </div>
               <div className="flex items-center space-x-2">
                 <img 
-                  src="https://strong-violet-s3qekg2q.edgeone.dev/WhatsApp%20Image%202026-05-29%20at%2023.14.18.jpeg" 
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/app_logo.jpg"; }}
+                  src="/app_logo.jpg" 
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = "https://strong-violet-s3qekg2q.edgeone.dev/WhatsApp%20Image%202026-05-29%20at%2023.14.18.jpeg"; }}
                   alt="R&GChat Logo" 
-                  className="w-5 h-5 rounded-full object-cover border border-white/40 shadow-sm" 
+                  className="w-6 h-6 rounded-full object-cover border border-white/40 shadow-sm" 
                   referrerPolicy="no-referrer" 
                 />
                 <div>
@@ -1748,10 +1748,16 @@ export default function App() {
               <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.02)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
               
               <div className="max-w-md space-y-4">
-                <div className="w-24 h-24 rounded-full bg-[#00A884]/10 text-[#00A884] flex items-center justify-center mx-auto mb-2 shadow-inner">
-                  <MessageSquare className="w-12 h-12" />
+                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-[#00A884] mx-auto mb-2 shadow-lg">
+                  <img 
+                    src="/app_logo.jpg" 
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = "https://strong-violet-s3qekg2q.edgeone.dev/WhatsApp%20Image%202026-05-29%20at%2023.14.18.jpeg"; }}
+                    alt="R&GChat Logo" 
+                    className="w-full h-full object-cover" 
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
-                <h1 className="text-2xl font-bold text-[#41525D] font-sans">KopelChat Web Cinta 💖</h1>
+                <h1 className="text-2xl font-bold text-[#41525D] font-sans">R&amp;GChat 💬</h1>
                 <p className="text-xs text-[#667781] leading-relaxed">
                   Pilih salah satu ruang obrolan di sebelah kiri untuk mulai mengelola buku diary, to-do list kencan, timeline album, live location GPS, atau mengirim kabar sampai secara otomatis ke pasanganmu.
                 </p>
@@ -2437,7 +2443,7 @@ export default function App() {
               <div className="flex items-center space-x-2.5">
                 <Smartphone className="w-6 h-6 text-emerald-200" />
                 <div>
-                  <h3 className="font-bold text-base">Unduh Aplikasi KopelChat 📲</h3>
+                  <h3 className="font-bold text-base">Unduh Aplikasi R&amp;GChat 📲</h3>
                   <p className="text-[10px] text-emerald-100">Siap di-install di HP Android, iOS, &amp; Laptop/PC</p>
                 </div>
               </div>
