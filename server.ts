@@ -781,6 +781,52 @@ apiRouter.get("/geocode/reverse", async (req, res) => {
   res.json({ success: false, displayName: "" });
 });
 
+// Address Search Geocoding Helper
+apiRouter.get("/geocode/search", async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.json({ results: [] });
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(String(q))}&limit=5`, {
+      headers: {
+        "User-Agent": "CoupleApp/1.0 (contact@coupleapp.internal)"
+      },
+      signal: controller.signal
+    }).finally(() => clearTimeout(timeoutId));
+
+    if (response.ok) {
+      const data = await response.json();
+      return res.json({ results: data });
+    }
+  } catch (e) {}
+  res.json({ results: [] });
+});
+
+// IP Geolocation Fallback Helper
+apiRouter.get("/geocode/ip", async (req, res) => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const response = await fetch("https://ipapi.co/json/", {
+      signal: controller.signal
+    }).finally(() => clearTimeout(timeoutId));
+
+    if (response.ok) {
+      const data: any = await response.json();
+      if (data && data.latitude && data.longitude) {
+        return res.json({
+          success: true,
+          lat: data.latitude,
+          lng: data.longitude,
+          addressName: `${data.city || ""}, ${data.region || ""}, ${data.country_name || ""}`.trim().replace(/^,\s*/, "")
+        });
+      }
+    }
+  } catch (e) {}
+  res.json({ success: false });
+});
+
 // Toggle Live Location Sharing
 apiRouter.post("/live-location/toggle", async (req, res) => {
   const { user, isSharing } = req.body;

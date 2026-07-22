@@ -86,23 +86,31 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
     }
   }, []);
 
-  // Send coordinates to server
-  const sendLocationToServer = useCallback(async (lat: number, lng: number, accuracy?: number, customNote?: string) => {
-    try {
-      let addressName = "";
+  // Search address state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchNotice, setSearchNotice] = useState("");
 
-      // 1. Try server-side reverse geocoding
-      try {
-        const geoRes = await fetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`);
-        if (geoRes.ok) {
-          const geoData = await geoRes.json();
-          if (geoData?.displayName) {
-            const parts = geoData.displayName.split(",");
-            addressName = parts.slice(0, 3).join(", ");
+  // Send coordinates to server
+  const sendLocationToServer = useCallback(async (lat: number, lng: number, accuracy?: number, customNote?: string, customAddressName?: string) => {
+    try {
+      let addressName = customAddressName || "";
+
+      if (!addressName) {
+        // 1. Try server-side reverse geocoding
+        try {
+          const geoRes = await fetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`);
+          if (geoRes.ok) {
+            const geoData = await geoRes.json();
+            if (geoData?.displayName) {
+              const parts = geoData.displayName.split(",");
+              addressName = parts.slice(0, 3).join(", ");
+            }
           }
+        } catch (e) {
+          // Fallback
         }
-      } catch (e) {
-        // Fallback
       }
 
       // 2. If reverse geocoding fails, format clean coordinate address
@@ -137,15 +145,32 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
     }
   }, [activeUser, myLocation?.statusNote, batteryLevel, onUpdateState]);
 
-  // Request & Fetch current GPS position with fallback
+  // Request & Fetch current GPS position with fallback to IP Geolocation
   const handleFetchCurrentGps = useCallback(() => {
-    if (!navigator.geolocation) {
-      setGpsError("Browser Anda tidak mendukung Geolocation GPS.");
-      return;
-    }
-
     setIsGpsLoading(true);
     setGpsError("");
+
+    const fallbackToIp = async (reasonNotice: string) => {
+      try {
+        const ipRes = await fetch("/api/geocode/ip");
+        if (ipRes.ok) {
+          const ipData = await ipRes.json();
+          if (ipData?.success && ipData.lat && ipData.lng) {
+            await sendLocationToServer(ipData.lat, ipData.lng, 100, undefined, ipData.addressName || "Lokasi via Jaringan IP");
+            setIsGpsLoading(false);
+            setGpsError(`${reasonNotice} Lokasi berhasil diperbarui menggunakan perkiraan jaringan IP.`);
+            return;
+          }
+        }
+      } catch (e) {}
+      setIsGpsLoading(false);
+      setGpsError(`${reasonNotice} Silakan cari alamat atau klik titik di peta untuk menentukan lokasi.`);
+    };
+
+    if (!navigator.geolocation) {
+      fallbackToIp("Browser Anda tidak mendukung GPS direct.");
+      return;
+    }
 
     const fetchGpsPos = (highAccuracy: boolean) => {
       navigator.geolocation.getCurrentPosition(
@@ -157,26 +182,84 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
         },
         (err) => {
           if (highAccuracy) {
-            // Retry with highAccuracy false (WiFi/IP triangulation fallback)
+            // Retry with low accuracy (WiFi / Cellular triangulation)
             fetchGpsPos(false);
           } else {
-            setIsGpsLoading(false);
             console.warn("GPS error:", err);
+            let errMsg = "Akses lokasi GPS tidak dapat diperoleh.";
             if (err.code === err.PERMISSION_DENIED) {
-              setGpsError("Izin GPS ditolak di browser. Mohon izinkan akses lokasi untuk situs ini.");
+              errMsg = "Izin lokasi GPS belum diizinkan.";
             } else if (err.code === err.POSITION_UNAVAILABLE) {
-              setGpsError("Sinyal lokasi GPS tidak tersedia saat ini. Pastikan GPS HP aktif.");
+              errMsg = "Sinyal GPS belum ditemukan.";
             } else {
-              setGpsError("Waktu permintaan lokasi GPS habis. Silakan coba lagi.");
+              errMsg = "Waktu GPS habis.";
             }
+            fallbackToIp(errMsg);
           }
         },
-        { enableHighAccuracy: highAccuracy, timeout: highAccuracy ? 8000 : 15000, maximumAge: 0 }
+        { enableHighAccuracy: highAccuracy, timeout: highAccuracy ? 8000 : 12000, maximumAge: 60000 }
       );
     };
 
     fetchGpsPos(true);
   }, [sendLocationToServer]);
+
+  // Address search handler
+  const handleSearchAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setIsSearching(true);
+    setSearchNotice("");
+    try {
+      const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(searchQuery)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.results && data.results.length > 0) {
+          setSearchResults(data.results);
+        } else {
+          setSearchResults([]);
+          setSearchNotice("Lokasi tidak ditemukan. Coba kata kunci lain (contoh: Medan, Jakarta, UI).");
+        }
+      }
+    } catch (e) {
+      setSearchNotice("Gagal melakukan pencarian lokasi.");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Select search result
+  const handleSelectSearchResult = (result: any) => {
+    const lat = parseFloat(result.lat);
+    const lng = parseFloat(result.lon);
+    const parts = (result.display_name || "").split(",");
+    const shortName = parts.slice(0, 3).join(", ");
+    sendLocationToServer(lat, lng, 10, undefined, shortName);
+    setSearchResults([]);
+    setSearchQuery("");
+    setSearchNotice(`✅ Lokasi diperbarui ke: ${shortName}`);
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.setView([lat, lng], 15);
+    }
+  };
+
+  // Quick set from profile address
+  const handleSetFromProfileAddress = async (addressText: string, label: string) => {
+    if (!addressText) return;
+    setIsSearching(true);
+    try {
+      const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(addressText)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.results && data.results.length > 0) {
+          handleSelectSearchResult(data.results[0]);
+          return;
+        }
+      }
+    } catch (e) {}
+    setIsSearching(false);
+    setSearchNotice(`Atur alamat dari profil (${label}): ${addressText}`);
+  };
 
   // Periodic GPS watch / auto sync
   useEffect(() => {
@@ -241,6 +324,11 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
     }
   };
 
+  const sendLocationRef = useRef(sendLocationToServer);
+  useEffect(() => {
+    sendLocationRef.current = sendLocationToServer;
+  }, [sendLocationToServer]);
+
   // Create Leaflet Custom DivIcon for users
   const createAvatarMarkerIcon = (user: "Grace" | "Rio", isSelf: boolean) => {
     const isGrace = user === "Grace";
@@ -295,6 +383,11 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
+
+      // Tap on map to set position directly
+      map.on("click", (e: L.LeafletMouseEvent) => {
+        sendLocationRef.current(e.latlng.lat, e.latlng.lng, 10);
+      });
 
       mapInstanceRef.current = map;
     }
@@ -467,6 +560,79 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Interactive Leaflet Map Container */}
         <div className="lg:col-span-2 flex flex-col space-y-3">
+          {/* Address Search & Quick Set Bar */}
+          <div className="bg-gray-50 p-3 rounded-2xl border border-gray-200 space-y-2">
+            <form onSubmit={handleSearchAddress} className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari alamat / kota (misal: Medan, UI, Kemang)..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-300 rounded-xl focus:outline-none focus:border-emerald-500 shadow-2xs"
+                />
+                <MapPinIcon className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" />
+              </div>
+              <button
+                type="submit"
+                disabled={isSearching}
+                className="px-3 py-1.5 bg-[#008069] hover:bg-[#006854] text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center space-x-1 shrink-0 disabled:opacity-60"
+              >
+                <RefreshCw className={`w-3 h-3 ${isSearching ? "animate-spin" : ""}`} />
+                <span>Cari</span>
+              </button>
+            </form>
+
+            {/* Profile address shortcuts */}
+            {(activePartnerInfo?.address || activePartnerInfo?.office) && (
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] pt-1 border-t border-gray-200/60">
+                <span className="text-gray-400 font-bold uppercase text-[9px]">Pilih Lokasi Profil:</span>
+                {activePartnerInfo.address && (
+                  <button
+                    type="button"
+                    onClick={() => handleSetFromProfileAddress(activePartnerInfo.address!, "Rumah")}
+                    className="px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg font-semibold transition cursor-pointer"
+                  >
+                    🏠 Rumah ({activePartnerInfo.address.split(",")[0]})
+                  </button>
+                )}
+                {activePartnerInfo.office && (
+                  <button
+                    type="button"
+                    onClick={() => handleSetFromProfileAddress(activePartnerInfo.office!, "Kantor")}
+                    className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg font-semibold transition cursor-pointer"
+                  >
+                    🏢 Kantor ({activePartnerInfo.office.split(",")[0]})
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Search Notice / Results Dropdown */}
+            {searchNotice && (
+              <div className="text-[11px] text-emerald-700 bg-emerald-50 p-2 rounded-xl border border-emerald-200 font-medium">
+                {searchNotice}
+              </div>
+            )}
+
+            {searchResults.length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-xl shadow-lg p-2 space-y-1 max-h-48 overflow-y-auto">
+                <span className="text-[10px] font-bold text-gray-400 block px-1">Pilih Lokasi Hasil Pencarian:</span>
+                {searchResults.map((res, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSelectSearchResult(res)}
+                    className="w-full text-left p-1.5 hover:bg-emerald-50 rounded-lg text-xs transition cursor-pointer flex items-start space-x-1.5 text-gray-700 border-b border-gray-50 last:border-none"
+                  >
+                    <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                    <span className="line-clamp-2">{res.display_name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="relative w-full h-[380px] md:h-[460px] bg-slate-100 rounded-3xl overflow-hidden border border-gray-200 shadow-inner">
             <div ref={mapContainerRef} className="w-full h-full z-0" />
 
