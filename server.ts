@@ -12,6 +12,17 @@ const PORT = 3000;
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// Enable CORS for Vercel & cross-origin deployment compatibility
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Path for persistent database (supports Vercel Serverless /tmp)
 const DB_DIR = process.env.VERCEL ? os.tmpdir() : path.join(process.cwd(), "data");
 const DB_FILE = path.join(DB_DIR, "db.json");
@@ -830,9 +841,7 @@ apiRouter.post("/notifications/clear", async (req, res) => {
 
 // Mount API router
 app.use("/api", apiRouter);
-if (process.env.VERCEL) {
-  app.use("/", apiRouter);
-}
+app.use(apiRouter);
 
 // Vite middleware setup for local Development and Production
 if (!process.env.VERCEL) {

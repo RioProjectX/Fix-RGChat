@@ -1,14 +1,14 @@
 {
-  "relationshipStartDate": "2023-10-15",
+  "relationshipStartDate": "2023-12-08",
   "partner1": {
     "name": "Grace",
     "avatar": "female-1",
     "office": "Kampus: Universitas Indonesia",
-    "address": "Rumah: Jl. Margonda Raya No. 12, Depok",
+    "address": "Jl. Amal Luhur , Komplek Buwono",
     "bio": ""
   },
   "partner2": {
-    "address": "Rumah: Jl. Kemang Raya No. 45, Jakarta Selatan",
+    "address": "Jl. Siboro , Komplek Prima Jaya",
     "avatar": "male-1",
     "office": "Kantor: Menara BCA, Grand Indonesia",
     "name": "Rio"
@@ -82,20 +82,20 @@
       "accuracy": 15,
       "updatedAt": "2026-07-22T06:29:35.419Z",
       "isSharing": true,
-      "addressName": "Jl. Margonda Raya, Depok",
+      "addressName": "Jl. Amal Luhur , Komplek Buwono",
       "statusNote": "Kuliah di Kampus UI 📚",
       "batteryLevel": 88
     },
     "Rio": {
       "user": "Rio",
-      "lat": -6.2615,
-      "lng": 106.8152,
-      "accuracy": 12,
-      "updatedAt": "2026-07-22T06:29:35.420Z",
+      "lat": 3.5543832641788646,
+      "lng": 98.6540994786973,
+      "accuracy": 35,
+      "updatedAt": "2026-07-22T09:24:39.258Z",
       "isSharing": true,
-      "addressName": "Kemang Raya, Jakarta Selatan",
-      "statusNote": "Di kantor Menara BCA 💻",
-      "batteryLevel": 94
+      "addressName": "Jalan Terompet,  Titi Rantai,  Medan Baru",
+      "statusNote": "pudans coffe",
+      "batteryLevel": 17
     }
   },
   "lastActiveRio": "2026-07-22T08:14:14.908Z"
