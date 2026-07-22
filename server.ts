@@ -141,6 +141,29 @@ try {
   console.error("Error reading initial database cache:", error);
 }
 
+// Helper to parse any Firestore REST field value into native JS
+function parseFirestoreValue(val: any): any {
+  if (!val) return null;
+  if ("stringValue" in val) return val.stringValue;
+  if ("integerValue" in val) return Number(val.integerValue);
+  if ("doubleValue" in val) return Number(val.doubleValue);
+  if ("booleanValue" in val) return val.booleanValue;
+  if ("nullValue" in val) return null;
+  if ("mapValue" in val) {
+    const fields = val.mapValue?.fields || {};
+    const res: any = {};
+    for (const key of Object.keys(fields)) {
+      res[key] = parseFirestoreValue(fields[key]);
+    }
+    return res;
+  }
+  if ("arrayValue" in val) {
+    const values = val.arrayValue?.values || [];
+    return values.map((v: any) => parseFirestoreValue(v));
+  }
+  return null;
+}
+
 // Helper to read database state (Firebase Firestore REST with Local File fallback)
 async function readDb(): Promise<any> {
   if (firestoreRestUrl) {
@@ -150,6 +173,7 @@ async function readDb(): Promise<any> {
         const json = await res.json();
         if (json && json.fields) {
           let stateObj: any = null;
+
           if (json.fields.stateJson && json.fields.stateJson.stringValue) {
             try {
               stateObj = JSON.parse(json.fields.stateJson.stringValue);
@@ -158,10 +182,14 @@ async function readDb(): Promise<any> {
             try {
               stateObj = JSON.parse(json.fields.state.stringValue);
             } catch (e) {}
+          } else if (json.fields.state && json.fields.state.mapValue) {
+            stateObj = parseFirestoreValue(json.fields.state);
+          } else {
+            stateObj = parseFirestoreValue({ mapValue: { fields: json.fields } });
           }
 
-          if (stateObj) {
-            localCacheState = stateObj;
+          if (stateObj && typeof stateObj === "object" && (stateObj.partner1 || stateObj.chatMessages)) {
+            localCacheState = { ...DEFAULT_STATE, ...stateObj };
             try {
               fs.writeFileSync(DB_FILE, JSON.stringify(localCacheState, null, 2), "utf-8");
             } catch (e) {}
@@ -178,21 +206,6 @@ async function readDb(): Promise<any> {
     }
   }
 
-  if (firestoreDb && isFirebaseConnected) {
-    try {
-      const docRef = doc(firestoreDb, "couple_state", "default");
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data && data.state) {
-          localCacheState = data.state;
-          return localCacheState;
-        }
-      }
-    } catch (error: any) {
-      console.error("[Firestore SDK] read failed:", error.message || error);
-    }
-  }
   return localCacheState;
 }
 
@@ -218,33 +231,30 @@ async function writeDb(data: any): Promise<void> {
         }
       };
 
-      const res = await fetch(firestoreRestUrl, {
+      const patchUrl = `${firestoreRestUrl}&updateMask.fieldPaths=stateJson&updateMask.fieldPaths=updatedAt`;
+
+      let res = await fetch(patchUrl, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
 
+      if (!res.ok && res.status === 404) {
+        res = await fetch(firestoreRestUrl, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }
+
       if (res.ok) {
         console.log("[Firestore REST] State successfully saved to Cloud Firestore.");
-        return;
       } else {
         const errText = await res.text();
         console.error("[Firestore REST] Write status error:", res.status, errText);
       }
     } catch (error: any) {
       console.error("[Firestore REST] Save failed:", error.message || error);
-    }
-  }
-
-  if (firestoreDb && isFirebaseConnected) {
-    try {
-      const docRef = doc(firestoreDb, "couple_state", "default");
-      await setDoc(docRef, {
-        state: data,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-    } catch (error: any) {
-      console.error("[Firestore SDK] Save failed:", error.message || error);
     }
   }
 }
