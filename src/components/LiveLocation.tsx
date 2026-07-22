@@ -516,6 +516,18 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
                   </span>
                 </div>
 
+                {/* Profile Registered Addresses */}
+                {(targetPartnerInfo?.address || targetPartnerInfo?.office) && (
+                  <div className="bg-white/80 p-2 rounded-xl border border-emerald-100 text-[10px] space-y-1 text-gray-600">
+                    {targetPartnerInfo.address && (
+                      <p><strong className="text-gray-700">🏠 Rumah:</strong> {targetPartnerInfo.address}</p>
+                    )}
+                    {targetPartnerInfo.office && (
+                      <p><strong className="text-gray-700">💼 Kantor/Kampus:</strong> {targetPartnerInfo.office}</p>
+                    )}
+                  </div>
+                )}
+
                 {partnerLocation.statusNote && (
                   <div className="bg-white p-2.5 rounded-xl border border-emerald-100 text-[11px] text-gray-600 italic">
                     "{partnerLocation.statusNote}"
@@ -616,6 +628,42 @@ export default function LiveLocation({ state, activeUser, onUpdateState }: LiveL
                   </button>
                 </div>
               </form>
+
+              {/* Quick Profile Address Shortcuts */}
+              {(activePartnerInfo?.address || activePartnerInfo?.office) && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {activePartnerInfo.address && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const note = `Di Rumah (${activePartnerInfo.address})`;
+                        setStatusNoteInput(note);
+                        if (myLocation?.lat && myLocation?.lng) {
+                          sendLocationToServer(myLocation.lat, myLocation.lng, myLocation.accuracy, note);
+                        }
+                      }}
+                      className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-lg border border-emerald-200 transition cursor-pointer"
+                    >
+                      🏠 Status: Rumah
+                    </button>
+                  )}
+                  {activePartnerInfo.office && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const note = `Di Kantor/Kampus (${activePartnerInfo.office})`;
+                        setStatusNoteInput(note);
+                        if (myLocation?.lat && myLocation?.lng) {
+                          sendLocationToServer(myLocation.lat, myLocation.lng, myLocation.accuracy, note);
+                        }
+                      }}
+                      className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold rounded-lg border border-amber-200 transition cursor-pointer"
+                    >
+                      💼 Status: Kantor/Kampus
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Battery & GPS Accuracy */}
               <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1 border-t border-gray-100">

@@ -97,6 +97,9 @@ export default function App() {
   const [editingName, setEditingName] = useState<string>("");
   const [editingAvatar, setEditingAvatar] = useState<string>("");
   const [editingBio, setEditingBio] = useState<string>("");
+  const [editingAddress, setEditingAddress] = useState<string>("");
+  const [editingOffice, setEditingOffice] = useState<string>("");
+  const [editingStartDate, setEditingStartDate] = useState<string>("");
   const [isSavingProfile, setIsSavingProfile] = useState<boolean>(false);
   const [dragActive, setDragActive] = useState<boolean>(false);
 
@@ -209,6 +212,9 @@ export default function App() {
     setEditingName(currentPartner.name);
     setEditingAvatar(currentPartner.avatar || "");
     setEditingBio(currentPartner.bio || "");
+    setEditingAddress(currentPartner.address || "");
+    setEditingOffice(currentPartner.office || "");
+    setEditingStartDate(state.relationshipStartDate || "2023-10-15");
     setIsProfileModalOpen(true);
   };
 
@@ -257,29 +263,47 @@ export default function App() {
       const updatedFields = {
         name: editingName,
         avatar: editingAvatar,
-        bio: editingBio
+        bio: editingBio,
+        address: editingAddress,
+        office: editingOffice
       };
 
-      let p1 = {};
-      let p2 = {};
-      if (activeUser === "Grace") {
-        p1 = updatedFields;
+      let p1 = state.partner1;
+      let p2 = state.partner2;
+      const isGrace = activeUser === "Grace" || (state.partner1?.name && activeUser.toLowerCase() === state.partner1.name.toLowerCase());
+      if (isGrace) {
+        p1 = { ...p1, ...updatedFields };
       } else {
-        p2 = updatedFields;
+        p2 = { ...p2, ...updatedFields };
       }
 
-      const res = await fetch("/api/partners", {
+      // Optimistic state update
+      setState(prev => prev ? {
+        ...prev,
+        relationshipStartDate: editingStartDate,
+        partner1: p1,
+        partner2: p2
+      } : prev);
+
+      await fetch("/api/partners", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ partner1: p1, partner2: p2 })
       });
-      if (res.ok) {
-        if (editingName.trim()) {
-          setActiveUser(editingName.trim());
-        }
-        await fetchState();
-        setIsProfileModalOpen(false);
+
+      if (editingStartDate) {
+        await fetch("/api/relationship-start-date", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: editingStartDate })
+        });
       }
+
+      if (editingName.trim()) {
+        setActiveUser(editingName.trim());
+      }
+      await fetchState();
+      setIsProfileModalOpen(false);
     } catch (err) {
       console.error("Gagal menyimpan profil:", err);
     } finally {
@@ -2399,11 +2423,44 @@ export default function App() {
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Bio / Status Cinta</label>
                     <textarea
-                      rows={3}
+                      rows={2}
                       placeholder="Tulis bio romantis atau statusmu di sini..."
                       className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#008069] text-[#4A403A] resize-none"
                       value={editingBio}
                       onChange={(e) => setEditingBio(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Alamat Rumah (Safe Arrival &amp; GPS)</label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Jl. Margonda Raya No. 12, Depok"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#008069] text-[#4A403A]"
+                        value={editingAddress}
+                        onChange={(e) => setEditingAddress(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Kantor / Kampus (Safe Arrival &amp; GPS)</label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Universitas Indonesia / Menara BCA"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#008069] text-[#4A403A]"
+                        value={editingOffice}
+                        onChange={(e) => setEditingOffice(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tanggal Hari Jadian (Anniversary)</label>
+                    <input
+                      type="date"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#008069] text-[#4A403A]"
+                      value={editingStartDate}
+                      onChange={(e) => setEditingStartDate(e.target.value)}
                     />
                   </div>
                 </div>

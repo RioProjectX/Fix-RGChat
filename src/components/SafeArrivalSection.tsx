@@ -21,9 +21,9 @@ export default function SafeArrivalSection({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Determine active partner's addresses
-  const actingAsP1 = activeUser === partner1.name;
-  const currentHome = actingAsP1 ? partner1.address : partner2.address;
-  const currentOffice = actingAsP1 ? partner1.office : partner2.office;
+  const actingAsP1 = activeUser === "Grace" || (partner1?.name && activeUser.toLowerCase() === partner1.name.toLowerCase());
+  const currentHome = actingAsP1 ? partner1?.address : partner2?.address;
+  const currentOffice = actingAsP1 ? partner1?.office : partner2?.office;
 
   const handleArrivalCheckin = async (location: string, type: "home" | "office" | "other") => {
     if (!location) return;
