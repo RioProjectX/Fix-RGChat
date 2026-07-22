@@ -288,7 +288,7 @@ apiRouter.get("/state", async (req, res) => {
     if (!lastActiveVal || (now.getTime() - new Date(lastActiveVal).getTime() >= 10000)) {
       const nowStr = now.toISOString();
       db[lastActiveKey] = nowStr;
-      await writeDb(db);
+      localCacheState[lastActiveKey] = nowStr;
     }
   }
   

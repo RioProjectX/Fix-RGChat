@@ -706,8 +706,90 @@ export default function App() {
     }
   };
 
+  // Sync client state directly to Firestore for immediate multi-device push
+  const syncStateToFirestore = useCallback(async (nextState: AppState) => {
+    if (!db) return;
+    try {
+      const docRef = doc(db, "couple_state", "default");
+      await setDoc(docRef, {
+        stateJson: JSON.stringify(nextState),
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (e) {
+      console.warn("[Client Firestore] setDoc sync error:", e);
+    }
+  }, []);
+
+  // Web Audio ringtone effect & notification trigger for incoming calls
+  useEffect(() => {
+    let audioCtx: AudioContext | null = null;
+    let ringInterval: any = null;
+
+    if (state?.activeCall && state.activeCall.status === "calling" && state.activeCall.receiver === activeUser) {
+      // Trigger system browser notification if allowed
+      if ("Notification" in window && Notification.permission === "granted") {
+        const callTypeLabel = state.activeCall.type === "video" ? "Video" : "Suara";
+        const notifTitle = `📞 Panggilan ${callTypeLabel} Masuk dari ${state.activeCall.caller}`;
+        const notifBody = `Klik untuk menerima panggilan ${callTypeLabel.toLowerCase()} romantis... 💖`;
+
+        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+          navigator.serviceWorker.ready.then((reg) => {
+            reg.showNotification(notifTitle, {
+              body: notifBody,
+              icon: "/icon.svg",
+              tag: "call-" + state.activeCall?.id
+            } as NotificationOptions);
+          });
+        } else {
+          new Notification(notifTitle, { body: notifBody, icon: "/icon.svg" });
+        }
+      }
+
+      // Synthesize incoming call chime ringtone sound
+      const playTone = () => {
+        try {
+          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+          if (!AudioContextClass) return;
+          if (!audioCtx) audioCtx = new AudioContextClass();
+          if (audioCtx.state === "suspended") audioCtx.resume();
+
+          const osc1 = audioCtx.createOscillator();
+          const osc2 = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+
+          osc1.type = "sine";
+          osc2.type = "sine";
+          osc1.frequency.setValueAtTime(440, audioCtx.currentTime);
+          osc2.frequency.setValueAtTime(480, audioCtx.currentTime);
+
+          gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
+
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc1.start();
+          osc2.start();
+          osc1.stop(audioCtx.currentTime + 1.2);
+          osc2.stop(audioCtx.currentTime + 1.2);
+        } catch (e) {}
+      };
+
+      playTone();
+      ringInterval = setInterval(playTone, 2200);
+    }
+
+    return () => {
+      if (ringInterval) clearInterval(ringInterval);
+      if (audioCtx) {
+        audioCtx.close().catch(() => {});
+      }
+    };
+  }, [state?.activeCall?.id, state?.activeCall?.status, state?.activeCall?.receiver, activeUser]);
+
   const handleSendMessage = async (text: string, mediaUrl: string) => {
-    if (!text && !mediaUrl) return;
+    if (!text && !mediaUrl || !state) return;
 
     const tempMsg = {
       id: "msg-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6),
@@ -720,30 +802,13 @@ export default function App() {
       isRead: false
     };
 
-    let nextState: AppState | null = null;
+    const nextState: AppState = {
+      ...state,
+      chatMessages: [...(state.chatMessages || []), tempMsg]
+    };
 
-    // Optimistic UI update so bubble chat appears instantly 0ms after user clicks send
-    setState((prev) => {
-      if (!prev) return prev;
-      nextState = {
-        ...prev,
-        chatMessages: [...(prev.chatMessages || []), tempMsg]
-      };
-      return nextState;
-    });
-
-    // Write to client Firestore directly for instant real-time sync on partner's device
-    if (db && nextState) {
-      try {
-        const docRef = doc(db, "couple_state", "default");
-        await setDoc(docRef, {
-          stateJson: JSON.stringify(nextState),
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      } catch (e) {
-        console.warn("Direct setDoc error:", e);
-      }
-    }
+    setState(nextState);
+    syncStateToFirestore(nextState);
 
     try {
       await fetch("/api/chat-message", {
@@ -868,6 +933,7 @@ export default function App() {
   };
 
   const handleTriggerCall = async (type: "audio" | "video") => {
+    if (!state) return;
     const caller = activeUser;
     const receiver = caller === "Grace" ? "Rio" : "Grace";
     const callObj: ActiveCallState = {
@@ -879,24 +945,13 @@ export default function App() {
       createdAt: new Date().toISOString()
     };
 
-    let nextState: AppState | null = null;
-    setState((prev) => {
-      if (!prev) return prev;
-      nextState = { ...prev, activeCall: callObj };
-      return nextState;
-    });
+    const nextState: AppState = {
+      ...state,
+      activeCall: callObj
+    };
 
-    if (db && nextState) {
-      try {
-        const docRef = doc(db, "couple_state", "default");
-        await setDoc(docRef, {
-          stateJson: JSON.stringify(nextState),
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      } catch (e) {
-        console.warn("Client setDoc call trigger error:", e);
-      }
-    }
+    setState(nextState);
+    syncStateToFirestore(nextState);
 
     try {
       await fetch("/api/call/start", {
@@ -917,24 +972,13 @@ export default function App() {
       startedAt: new Date().toISOString()
     };
 
-    let nextState: AppState | null = null;
-    setState((prev) => {
-      if (!prev) return prev;
-      nextState = { ...prev, activeCall: updatedCall };
-      return nextState;
-    });
+    const nextState: AppState = {
+      ...state,
+      activeCall: updatedCall
+    };
 
-    if (db && nextState) {
-      try {
-        const docRef = doc(db, "couple_state", "default");
-        await setDoc(docRef, {
-          stateJson: JSON.stringify(nextState),
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      } catch (e) {
-        console.warn("Client setDoc call answer error:", e);
-      }
-    }
+    setState(nextState);
+    syncStateToFirestore(nextState);
 
     try {
       await fetch("/api/call/answer", {
@@ -948,47 +992,31 @@ export default function App() {
   };
 
   const handleDeclineCall = async () => {
+    if (!state) return;
     stopCameraStream();
     setCallDuration(0);
 
-    let nextState: AppState | null = null;
-    setState((prev) => {
-      if (!prev) return prev;
-      if (prev.activeCall) {
-        const callTypeLabel = prev.activeCall.type === "video" ? "Video" : "Suara";
-        const callMsg = {
-          id: "msg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
-          sender: prev.activeCall.caller,
-          text: `📞 Panggilan ${callTypeLabel} Ditolak`,
-          timestamp: new Date().toISOString(),
-          isFavorited: false,
-          mediaUrl: "",
-          mediaType: "",
-          isRead: false
-        };
-        const currentMsgs = Array.isArray(prev.chatMessages) ? prev.chatMessages : [];
-        nextState = {
-          ...prev,
-          activeCall: null,
-          chatMessages: [...currentMsgs, callMsg]
-        };
-      } else {
-        nextState = { ...prev, activeCall: null };
-      }
-      return nextState;
-    });
+    const callTypeLabel = state.activeCall?.type === "video" ? "Video" : "Suara";
+    const callMsg = state.activeCall ? {
+      id: "msg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+      sender: state.activeCall.caller,
+      text: `📞 Panggilan ${callTypeLabel} Ditolak`,
+      timestamp: new Date().toISOString(),
+      isFavorited: false,
+      mediaUrl: "",
+      mediaType: "",
+      isRead: false
+    } : null;
 
-    if (db && nextState) {
-      try {
-        const docRef = doc(db, "couple_state", "default");
-        await setDoc(docRef, {
-          stateJson: JSON.stringify(nextState),
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      } catch (e) {
-        console.warn("Client setDoc call decline error:", e);
-      }
-    }
+    const currentMsgs = Array.isArray(state.chatMessages) ? state.chatMessages : [];
+    const nextState: AppState = {
+      ...state,
+      activeCall: null,
+      chatMessages: callMsg ? [...currentMsgs, callMsg] : currentMsgs
+    };
+
+    setState(nextState);
+    syncStateToFirestore(nextState);
 
     try {
       await fetch("/api/call/decline", {
@@ -1002,62 +1030,47 @@ export default function App() {
   };
 
   const handleEndCall = async () => {
+    if (!state) return;
     stopCameraStream();
     const currentDuration = callDuration;
     setCallDuration(0);
 
-    let nextState: AppState | null = null;
-    setState((prev) => {
-      if (!prev) return prev;
-      if (prev.activeCall) {
-        const currentCall = prev.activeCall;
-        const callTypeLabel = currentCall.type === "video" ? "Video" : "Suara";
-        let logText = "";
-        if (currentCall.status === "connected") {
-          const m = Math.floor(currentDuration / 60);
-          const s = currentDuration % 60;
-          const timeFormatted = `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-          logText = `📞 Panggilan ${callTypeLabel} Selesai (${timeFormatted})`;
-        } else if (currentCall.status === "calling") {
-          logText = currentCall.caller === activeUser
-            ? `📞 Panggilan ${callTypeLabel} Dibatalkan`
-            : `📞 Panggilan ${callTypeLabel} Tidak Terjawab`;
-        }
-
-        const callMsg = {
-          id: "msg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
-          sender: currentCall.caller,
-          text: logText,
-          timestamp: new Date().toISOString(),
-          isFavorited: false,
-          mediaUrl: "",
-          mediaType: "",
-          isRead: false
-        };
-
-        const currentMsgs = Array.isArray(prev.chatMessages) ? prev.chatMessages : [];
-        nextState = {
-          ...prev,
-          activeCall: null,
-          chatMessages: logText ? [...currentMsgs, callMsg] : currentMsgs
-        };
-      } else {
-        nextState = { ...prev, activeCall: null };
-      }
-      return nextState;
-    });
-
-    if (db && nextState) {
-      try {
-        const docRef = doc(db, "couple_state", "default");
-        await setDoc(docRef, {
-          stateJson: JSON.stringify(nextState),
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      } catch (e) {
-        console.warn("Client setDoc call end error:", e);
+    let logText = "";
+    if (state.activeCall) {
+      const currentCall = state.activeCall;
+      const callTypeLabel = currentCall.type === "video" ? "Video" : "Suara";
+      if (currentCall.status === "connected") {
+        const m = Math.floor(currentDuration / 60);
+        const s = currentDuration % 60;
+        const timeFormatted = `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+        logText = `📞 Panggilan ${callTypeLabel} Selesai (${timeFormatted})`;
+      } else if (currentCall.status === "calling") {
+        logText = currentCall.caller === activeUser
+          ? `📞 Panggilan ${callTypeLabel} Dibatalkan`
+          : `📞 Panggilan ${callTypeLabel} Tidak Terjawab`;
       }
     }
+
+    const callMsg = logText ? {
+      id: "msg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+      sender: state.activeCall?.caller || activeUser,
+      text: logText,
+      timestamp: new Date().toISOString(),
+      isFavorited: false,
+      mediaUrl: "",
+      mediaType: "",
+      isRead: false
+    } : null;
+
+    const currentMsgs = Array.isArray(state.chatMessages) ? state.chatMessages : [];
+    const nextState: AppState = {
+      ...state,
+      activeCall: null,
+      chatMessages: callMsg ? [...currentMsgs, callMsg] : currentMsgs
+    };
+
+    setState(nextState);
+    syncStateToFirestore(nextState);
 
     try {
       await fetch("/api/call/end", {
